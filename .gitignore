@@ -3,10 +3,6 @@
 build/
 !**/src/**/build/
 
-# JetBrains IDEs
-.idea
-*.iml
-
 # Paperweight
 run/
 !**/src/**/run/
@@ -14,3 +10,10 @@ run/
 # Cardstock
 /cardstock-api/
 /cardstock-server/
+
+# None of the above apply to registry
+!/registry/**
+
+# JetBrains IDEs
+.idea
+*.iml

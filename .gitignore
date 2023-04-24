@@ -1,0 +1,12 @@
+# Gradle
+.gradle
+build/
+!**/src/**/build/
+
+# JetBrains IDEs
+.idea
+*.iml
+
+# Cardstock
+/cardstock-api/
+/cardstock-server/

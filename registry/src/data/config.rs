@@ -1,9 +1,18 @@
 use crate::data::PersistentData;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]
 pub struct Config {
     pub bind_addr: String,
+    pub save: SaveConfig,
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]
+pub struct SaveConfig {
+    pub enabled: bool,
+    #[serde(with = "humantime_serde")]
+    pub interval: Duration,
 }
 
 impl PersistentData for Config {

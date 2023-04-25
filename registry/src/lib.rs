@@ -22,12 +22,14 @@ pub fn run() -> Result<()> {
     debug!("Using data store: {data:?}");
     let data = Arc::new(RwLock::new(data));
 
-    let save_config = Arc::clone(&config);
-    let save_data = Arc::clone(&data);
-    thread::Builder::new()
-        .name("save".into())
-        .spawn(|| save_periodically(save_config, save_data))
-        .context("failed to spawn the save thread")?;
+    if config.save.enabled {
+        let save_config = Arc::clone(&config);
+        let save_data = Arc::clone(&data);
+        thread::Builder::new()
+            .name("save".into())
+            .spawn(|| save_periodically(save_config, save_data))
+            .context("failed to spawn the save thread")?;
+    }
 
     thread::Builder::new()
         .name("listen".into())

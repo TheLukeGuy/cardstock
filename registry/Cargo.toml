@@ -6,6 +6,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.70"
+byteorder = "1.4.3"
 humantime-serde = "1.1.1"
 log = "0.4.17"
 serde = { version = "1.0.160", features = ["derive", "rc"] }

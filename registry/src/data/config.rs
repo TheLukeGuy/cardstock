@@ -4,8 +4,14 @@ use std::time::Duration;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]
 pub struct Config {
-    pub bind_addr: String,
+    pub server: ServerConfig,
     pub save: SaveConfig,
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]
+pub struct ServerConfig {
+    pub bind_addr: String,
+    pub error_tolerance: i32,
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]

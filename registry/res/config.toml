@@ -1,4 +1,6 @@
+[server]
 bind_addr = "0.0.0.0:15656"
+error_tolerance = 5
 
 [save]
 enabled = true

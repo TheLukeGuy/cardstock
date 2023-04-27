@@ -1,0 +1,378 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Luke Chambers <consolelogluke@gmail.com>
+Date: Wed, 26 Apr 2023 22:15:36 -0400
+Subject: [PATCH] Add registry client
+
+
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index a68ccce5be03e847116519e152945f88dab71d3c..9452889991961403ac7999bd25bc71f25bdc82bd 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -295,6 +295,7 @@ public final class CraftServer implements Server {
+     public static Exception excessiveVelEx; // Paper - Velocity warnings
+     private final io.papermc.paper.logging.SysoutCatcher sysoutCatcher = new io.papermc.paper.logging.SysoutCatcher(); // Paper
+     private final CraftPotionBrewer potionBrewer = new CraftPotionBrewer(); // Paper
++    private final sh.lpx.cardstock.registry.RegistryClient registryClient; // Cardstock
+ 
+     static {
+         ConfigurationSerialization.registerClass(CraftOfflinePlayer.class);
+@@ -315,6 +316,16 @@ public final class CraftServer implements Server {
+         this.serverVersion = CraftServer.class.getPackage().getImplementationVersion();
+         this.structureManager = new CraftStructureManager(console.getStructureManager());
+ 
++        // Cardstock start
++        sh.lpx.cardstock.registry.packet.client.ClientHandshakePacket handshake =
++            new sh.lpx.cardstock.registry.packet.client.ClientHandshakePacket(this.getVersion());
++        try {
++            this.registryClient = sh.lpx.cardstock.registry.RegistryClient.connect("127.0.0.1:15656", handshake);
++        } catch (IOException e) {
++            throw new RuntimeException("Failed to connect to the registry server.", e);
++        }
++        // Cardstock end
++
+         Bukkit.setServer(this);
+ 
+         // Register all the Enchantments and PotionTypes now so we can stop new registration immediately after
+diff --git a/src/main/java/sh/lpx/cardstock/registry/RegistryClient.java b/src/main/java/sh/lpx/cardstock/registry/RegistryClient.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..46ea5aac0db3c76a5ea43e4ef3c1c3eb65a467b9
+--- /dev/null
++++ b/src/main/java/sh/lpx/cardstock/registry/RegistryClient.java
+@@ -0,0 +1,80 @@
++package sh.lpx.cardstock.registry;
++
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
++import sh.lpx.cardstock.registry.packet.PacketByteBuf;
++import sh.lpx.cardstock.registry.packet.client.ClientHandshakePacket;
++import sh.lpx.cardstock.registry.packet.client.ClientPacket;
++
++import java.io.*;
++import java.net.Socket;
++
++public class RegistryClient
++    implements Closeable
++{
++    private final Socket socket;
++
++    private final InputStream inputStream;
++    private final OutputStream outputStream;
++
++    private RegistryClient(
++        @NotNull Socket socket,
++        @NotNull InputStream inputStream,
++        @NotNull OutputStream outputStream
++    ) {
++        this.socket = socket;
++        this.inputStream = inputStream;
++        this.outputStream = outputStream;
++    }
++
++    public static @NotNull RegistryClient connect(@NotNull String addr, @Nullable ClientHandshakePacket handshake)
++        throws IOException
++    {
++        if (!addr.contains(":")) {
++            throw new IllegalArgumentException("The address is in an invalid format.");
++        }
++
++        int separatorIndex = addr.lastIndexOf(":");
++        String host;
++        int port;
++        if (separatorIndex != -1) {
++            host = addr.substring(0, separatorIndex);
++            port = Integer.parseInt(addr.substring(separatorIndex + 1));
++        } else {
++            host = null;
++            port = Integer.parseInt(addr);
++        }
++
++        Socket socket = new Socket(host, port);
++        RegistryClient client = new RegistryClient(socket, socket.getInputStream(), socket.getOutputStream());
++        if (handshake != null) {
++            client.sendPacket(handshake);
++        }
++        return client;
++    }
++
++    public void sendPacket(@NotNull ClientPacket packet)
++        throws IOException
++    {
++        PacketByteBuf buf = PacketByteBuf.allocateDefault(3);
++        buf.writePacket(packet);
++        try {
++            buf.writeToOtherFromBeginning(bytes -> {
++                try {
++                    this.outputStream.write(bytes);
++                } catch (IOException e) {
++                    throw new UncheckedIOException(e);
++                }
++            });
++        } catch (UncheckedIOException e) {
++            throw e.getCause();
++        }
++    }
++
++    @Override
++    public void close()
++        throws IOException
++    {
++        this.socket.close();
++    }
++}
+diff --git a/src/main/java/sh/lpx/cardstock/registry/packet/PacketByteBuf.java b/src/main/java/sh/lpx/cardstock/registry/packet/PacketByteBuf.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d22a456388a94f969ed4a779fafb6392ba9827da
+--- /dev/null
++++ b/src/main/java/sh/lpx/cardstock/registry/packet/PacketByteBuf.java
+@@ -0,0 +1,151 @@
++package sh.lpx.cardstock.registry.packet;
++
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
++import sh.lpx.cardstock.registry.packet.client.ClientPacket;
++
++import java.nio.ByteBuffer;
++import java.nio.ByteOrder;
++import java.nio.charset.StandardCharsets;
++import java.util.Arrays;
++import java.util.function.Consumer;
++
++public class PacketByteBuf {
++    private final ByteBuffer buf;
++
++    private PacketByteBuf(@NotNull ByteBuffer buf) {
++        this.buf = buf;
++    }
++
++    public static PacketByteBuf allocateDefault() {
++        return allocateDefault(0);
++    }
++
++    public static PacketByteBuf allocateDefault(int additional) {
++        return allocate(1024 + additional);
++    }
++
++    public static PacketByteBuf allocate(int capacity) {
++        return wrap(ByteBuffer.allocate(capacity));
++    }
++
++    public static PacketByteBuf wrap(@NotNull ByteBuffer buf) {
++        buf.order(ByteOrder.BIG_ENDIAN);
++        return new PacketByteBuf(buf);
++    }
++
++    public void writeToOtherFromBeginning(@NotNull Consumer<byte[]> writer) {
++        this.writeToOtherFromBeginning(null, writer);
++    }
++
++    public void writeToOtherFromBeginning(@Nullable Consumer<Integer> useLen, @NotNull Consumer<byte[]> writer) {
++        if (!this.buf.hasArray()) {
++            throw new IllegalStateException("The buffer isn't backed by an array.");
++        }
++
++        this.buf.rewind();
++        int len = this.buf.remaining();
++        if (useLen != null) {
++            useLen.accept(len);
++        }
++
++        if (!this.buf.hasRemaining()) {
++            return;
++        }
++        byte[] backing = this.buf.array();
++        int startPos = this.buf.position();
++        int startIndex = this.buf.arrayOffset() + this.buf.position();
++
++        writer.accept(Arrays.copyOfRange(backing, startIndex, startIndex + len));
++        this.buf.position(startPos + len);
++    }
++
++    public void writePacket(@NotNull ClientPacket packet) {
++        PacketByteBuf buf = allocateDefault();
++        packet.write(buf);
++        buf.writeToOtherFromBeginning(
++            len -> {
++                this.writeUnsignedShort(len);
++                this.writeUnsignedByte(packet.id());
++            },
++            this::writeAll
++        );
++    }
++
++    public String readString() {
++        int len = this.readUnsignedShort();
++        byte[] buf = new byte[len];
++        this.readExact(buf);
++        return new String(buf, StandardCharsets.UTF_8);
++    }
++
++    public void writeString(@NotNull String s) {
++        this.writeUnsignedShort(s.length());
++        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
++        this.writeAll(bytes);
++    }
++
++    public void readExact(byte @NotNull [] buf) {
++        this.buf.get(buf);
++    }
++
++    public void writeAll(byte @NotNull [] buf) {
++        this.buf.put(buf);
++    }
++
++    public byte readSignedByte() {
++        return this.buf.get();
++    }
++
++    public void writeSignedByte(byte b) {
++        this.buf.put(b);
++    }
++
++    public int readUnsignedByte() {
++        return Byte.toUnsignedInt(this.buf.get());
++    }
++
++    public void writeUnsignedByte(int b) {
++        this.buf.put((byte) b);
++    }
++
++    public short readSignedShort() {
++        return this.buf.getShort();
++    }
++
++    public void writeSignedShort(short s) {
++        this.buf.putShort(s);
++    }
++
++    public int readUnsignedShort() {
++        return Short.toUnsignedInt(this.buf.getShort());
++    }
++
++    public void writeUnsignedShort(int s) {
++        this.buf.putShort((short) s);
++    }
++
++    public int readSignedInt() {
++        return this.buf.getInt();
++    }
++
++    public void writeSignedInt(int i) {
++        this.buf.putInt(i);
++    }
++
++    public long readUnsignedInt() {
++        return Integer.toUnsignedLong(this.buf.getInt());
++    }
++
++    public void writeUnsignedInt(long i) {
++        this.buf.putInt((int) i);
++    }
++
++    public long readSignedLong() {
++        return this.buf.getLong();
++    }
++
++    public void writeSignedLong(long l) {
++        this.buf.putLong(l);
++    }
++}
+diff --git a/src/main/java/sh/lpx/cardstock/registry/packet/PartialPacket.java b/src/main/java/sh/lpx/cardstock/registry/packet/PartialPacket.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b81a1620cd63b111636fe2c2ee44bf115d710a29
+--- /dev/null
++++ b/src/main/java/sh/lpx/cardstock/registry/packet/PartialPacket.java
+@@ -0,0 +1,45 @@
++package sh.lpx.cardstock.registry.packet;
++
++import org.jetbrains.annotations.NotNull;
++
++import java.nio.ByteBuffer;
++import java.util.Optional;
++
++public class PartialPacket {
++    private Byte firstLenByte = null;
++    private Byte id = null;
++
++    private byte[] packet = null;
++    private int cursor = 0;
++
++    public @NotNull Optional<Complete> next(byte b) {
++        if (this.firstLenByte == null) {
++            this.firstLenByte = b;
++            return Optional.empty();
++        }
++
++        if (this.packet == null) {
++            int len = (this.firstLenByte << 16) | b;
++            this.packet = new byte[len];
++            return Optional.empty();
++        }
++
++        if (this.id == null) {
++            this.id = b;
++            if (this.packet.length == 0) {
++                Complete complete = new Complete(this.id, ByteBuffer.wrap(this.packet));
++                return Optional.of(complete);
++            }
++            return Optional.empty();
++        }
++
++        this.packet[this.cursor++] = b;
++        if (this.cursor == this.packet.length) {
++            Complete complete = new Complete(this.id, ByteBuffer.wrap(this.packet));
++            return Optional.of(complete);
++        }
++        return Optional.empty();
++    }
++
++    public record Complete(byte id, @NotNull ByteBuffer packet) {}
++}
+diff --git a/src/main/java/sh/lpx/cardstock/registry/packet/client/ClientHandshakePacket.java b/src/main/java/sh/lpx/cardstock/registry/packet/client/ClientHandshakePacket.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..5679038731027ecfffffe4c5a5a66d2f3ccb86ab
+--- /dev/null
++++ b/src/main/java/sh/lpx/cardstock/registry/packet/client/ClientHandshakePacket.java
+@@ -0,0 +1,18 @@
++package sh.lpx.cardstock.registry.packet.client;
++
++import org.jetbrains.annotations.NotNull;
++import sh.lpx.cardstock.registry.packet.PacketByteBuf;
++
++public record ClientHandshakePacket(@NotNull String version)
++    implements ClientPacket
++{
++    @Override
++    public int id() {
++        return 0x00;
++    }
++
++    @Override
++    public void write(@NotNull PacketByteBuf buf) {
++        buf.writeString(this.version);
++    }
++}
+diff --git a/src/main/java/sh/lpx/cardstock/registry/packet/client/ClientPacket.java b/src/main/java/sh/lpx/cardstock/registry/packet/client/ClientPacket.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..2f5cf2333c6c33cf6ba7ae1acb1fc8ef1ac44292
+--- /dev/null
++++ b/src/main/java/sh/lpx/cardstock/registry/packet/client/ClientPacket.java
+@@ -0,0 +1,10 @@
++package sh.lpx.cardstock.registry.packet.client;
++
++import org.jetbrains.annotations.NotNull;
++import sh.lpx.cardstock.registry.packet.PacketByteBuf;
++
++public interface ClientPacket {
++    int id();
++
++    void write(@NotNull PacketByteBuf buf);
++}
+diff --git a/src/main/java/sh/lpx/cardstock/registry/packet/server/ServerPacket.java b/src/main/java/sh/lpx/cardstock/registry/packet/server/ServerPacket.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..16095e21c4b793fc64bece65d3ee8d281ae90c5b
+--- /dev/null
++++ b/src/main/java/sh/lpx/cardstock/registry/packet/server/ServerPacket.java
+@@ -0,0 +1,3 @@
++package sh.lpx.cardstock.registry.packet.server;
++
++public interface ServerPacket {}

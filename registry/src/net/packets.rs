@@ -31,7 +31,7 @@ impl ServerPacket {
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub enum PartialPacket {
-    AwaitingLen(Vec<u8>),
+    AwaitingLen(Option<u8>),
     Incomplete {
         expected: usize,
         id: Option<u8>,
@@ -45,24 +45,20 @@ pub enum PartialPacket {
 
 impl PartialPacket {
     pub fn new() -> Self {
-        Self::AwaitingLen(Vec::with_capacity(2))
+        Self::AwaitingLen(None)
     }
 
-    pub fn next(mut self, byte: u8) -> Self {
+    pub fn next(self, byte: u8) -> Self {
         match self {
-            Self::AwaitingLen(ref mut packet) => {
-                packet.push(byte);
-                if packet.len() == 2 {
-                    let len = u16::from_be_bytes(packet[..].try_into().unwrap()).into();
-                    Self::Incomplete {
-                        expected: len,
-                        id: None,
-                        packet: Vec::with_capacity(len),
-                    }
-                } else {
-                    self
+            Self::AwaitingLen(Some(packet)) => {
+                let len = u16::from_be_bytes([packet, byte]).into();
+                Self::Incomplete {
+                    expected: len,
+                    id: None,
+                    packet: Vec::with_capacity(len),
                 }
             }
+            Self::AwaitingLen(_) => Self::AwaitingLen(Some(byte)),
             Self::Incomplete {
                 expected,
                 id: Some(id),
@@ -79,6 +75,11 @@ impl PartialPacket {
                     }
                 }
             }
+            Self::Incomplete {
+                expected,
+                id: _,
+                packet,
+            } if expected == 0 => Self::Complete { id: byte, packet },
             Self::Incomplete {
                 expected,
                 id: _,

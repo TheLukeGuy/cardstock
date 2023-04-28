@@ -3,7 +3,7 @@ use crate::data::store::DataStore;
 use crate::data::PersistentData;
 use crate::net::packets::{ClientPacket, ServerPacket};
 use crate::net::types::{NetReadExt, NetWriteExt};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use log::{debug, error, info, warn};
 use std::borrow::Cow;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -67,7 +67,7 @@ fn listen(config: Arc<Config>, data: Arc<RwLock<DataStore>>) -> Result<()> {
         let connection_data = Arc::clone(&data);
         let result = thread::Builder::new()
             .name(format!("conn/{formatted_addr}"))
-            .spawn(|| handle_connection(stream, connection_config, connection_data))
+            .spawn(|| Connection::new(stream).run(connection_config, connection_data))
             .context("failed to spawn the connection handle thread");
         if let Err(error) = result {
             warn!("Failed to start connection handling for {formatted_addr}: {error:?}");
@@ -77,38 +77,55 @@ fn listen(config: Arc<Config>, data: Arc<RwLock<DataStore>>) -> Result<()> {
     Ok(())
 }
 
-fn handle_connection(mut stream: TcpStream, config: Arc<Config>, data: Arc<RwLock<DataStore>>) {
-    let set_error_tolerance = config.server.error_tolerance >= 0;
-    let mut errors = 0;
-    loop {
-        if let Err(error) = next_packet(&mut stream, &data) {
-            warn!("Failed to handle a packet: {error:?}");
-            if set_error_tolerance {
-                if errors == config.server.error_tolerance {
-                    error!("Failed to handle too many packets.");
-                    break;
-                }
-                errors += 1;
-            }
-        } else if set_error_tolerance {
-            errors = 0;
-        }
-    }
+pub struct Connection {
+    stream: TcpStream,
+    did_handshake: bool,
 }
 
-fn next_packet(stream: &mut TcpStream, _data: &Arc<RwLock<DataStore>>) -> Result<()> {
-    let packet = stream
-        .read_packet()
-        .context("failed to read the next packet")?;
-    match packet {
-        ClientPacket::Handshake { version } => {
-            info!("The client is using {version}.");
-            stream
-                .write_packet(&ServerPacket::Handshake)
-                .context("failed to send a handshake response")?;
+impl Connection {
+    pub fn new(stream: TcpStream) -> Self {
+        Self {
+            stream,
+            did_handshake: false,
         }
     }
-    Ok(())
+
+    pub fn run(&mut self, config: Arc<Config>, data: Arc<RwLock<DataStore>>) {
+        let set_error_tolerance = config.server.error_tolerance >= 0;
+        let mut errors = 0;
+        loop {
+            if let Err(error) = self.next_packet(&data) {
+                warn!("Failed to handle a packet: {error:?}");
+                if set_error_tolerance {
+                    if errors == config.server.error_tolerance {
+                        error!("Failed to handle too many packets.");
+                        break;
+                    }
+                    errors += 1;
+                }
+            } else if set_error_tolerance {
+                errors = 0;
+            }
+        }
+    }
+
+    fn next_packet(&mut self, _data: &Arc<RwLock<DataStore>>) -> Result<()> {
+        let packet = self
+            .stream
+            .read_packet()
+            .context("failed to read the next packet")?;
+        match packet {
+            ClientPacket::Handshake { version } => {
+                info!("The client is using {version}.");
+                self.stream
+                    .write_packet(&ServerPacket::Handshake)
+                    .context("failed to send a handshake response")?;
+                self.did_handshake = true;
+            }
+            _ if !self.did_handshake => bail!("received a non-handshake packet before handshake"),
+        }
+        Ok(())
+    }
 }
 
 fn save_periodically(config: Arc<Config>, data: Arc<RwLock<DataStore>>) {

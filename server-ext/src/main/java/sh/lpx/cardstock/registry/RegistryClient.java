@@ -8,6 +8,7 @@ import sh.lpx.cardstock.registry.packet.PacketByteBuf;
 import sh.lpx.cardstock.registry.packet.PartialPacket;
 import sh.lpx.cardstock.registry.packet.client.ClientHandshakePacket;
 import sh.lpx.cardstock.registry.packet.client.ClientPacket;
+import sh.lpx.cardstock.registry.packet.server.ServerHandshakePacket;
 import sh.lpx.cardstock.registry.packet.server.ServerPacket;
 
 import java.io.*;
@@ -19,6 +20,7 @@ public class RegistryClient
     private final Logger logger = LoggerFactory.getLogger(RegistryClient.class);
 
     private final Socket socket;
+    private boolean didHandshake = false;
 
     private final InputStream inputStream;
     private final OutputStream outputStream;
@@ -64,7 +66,7 @@ public class RegistryClient
         while (true) {
             try {
                 this.nextPacket();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 this.logger.error("Failed to handle a packet.", e);
                 // TODO: Stop trying if there are too many consecutive failed packets
             }
@@ -82,7 +84,12 @@ public class RegistryClient
     }
 
     private void actOnPacket(@NotNull ServerPacket packet) {
-        this.logger.info("Received packet: {}", packet);
+        switch (packet) {
+            case ServerHandshakePacket ignored -> this.didHandshake = true;
+            case ServerPacket ignored && !this.didHandshake ->
+                throw new IllegalStateException("Received a non-handshake packet before handshake.");
+            default -> this.logger.warn("Ignoring packet: {}", packet);
+        }
     }
 
     public void sendPacket(@NotNull ClientPacket packet)

@@ -1,18 +1,22 @@
 package sh.lpx.cardstock.registry.packet;
 
 import org.jetbrains.annotations.NotNull;
+import sh.lpx.cardstock.registry.packet.server.ServerPacket;
 
-import java.nio.ByteBuffer;
 import java.util.Optional;
 
 public class PartialPacket {
-    private Byte firstLenByte = null;
-    private Byte id = null;
+    private Integer firstLenByte;
+    private Integer id;
 
-    private byte[] packet = null;
-    private int cursor = 0;
+    private byte[] packet;
+    private int cursor;
 
-    public @NotNull Optional<Complete> next(byte b) {
+    public PartialPacket() {
+        this.reset();
+    }
+
+    public @NotNull Optional<@NotNull ServerPacket> next(int b) {
         if (this.firstLenByte == null) {
             this.firstLenByte = b;
             return Optional.empty();
@@ -27,19 +31,26 @@ public class PartialPacket {
         if (this.id == null) {
             this.id = b;
             if (this.packet.length == 0) {
-                Complete complete = new Complete(this.id, ByteBuffer.wrap(this.packet));
-                return Optional.of(complete);
+                ServerPacket packet = ServerPacket.read(id, PacketByteBuf.wrap(this.packet));
+                this.reset();
+                return Optional.of(packet);
             }
             return Optional.empty();
         }
 
-        this.packet[this.cursor++] = b;
+        this.packet[this.cursor++] = (byte) b;
         if (this.cursor == this.packet.length) {
-            Complete complete = new Complete(this.id, ByteBuffer.wrap(this.packet));
-            return Optional.of(complete);
+            ServerPacket packet = ServerPacket.read(id, PacketByteBuf.wrap(this.packet));
+            this.reset();
+            return Optional.of(packet);
         }
         return Optional.empty();
     }
 
-    public record Complete(byte id, @NotNull ByteBuffer packet) {}
+    private void reset() {
+        this.firstLenByte = null;
+        this.id = null;
+        this.packet = null;
+        this.cursor = 0;
+    }
 }

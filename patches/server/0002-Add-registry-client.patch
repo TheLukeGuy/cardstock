@@ -5,7 +5,7 @@ Subject: [PATCH] Add registry client
 
 
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index a68ccce5be03e847116519e152945f88dab71d3c..9452889991961403ac7999bd25bc71f25bdc82bd 100644
+index a68ccce5be03e847116519e152945f88dab71d3c..e0997c7f23bde95a98c2e1d1d55e3f5048c3184b 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 @@ -295,6 +295,7 @@ public final class CraftServer implements Server {
@@ -16,7 +16,7 @@ index a68ccce5be03e847116519e152945f88dab71d3c..9452889991961403ac7999bd25bc71f2
  
      static {
          ConfigurationSerialization.registerClass(CraftOfflinePlayer.class);
-@@ -315,6 +316,16 @@ public final class CraftServer implements Server {
+@@ -315,6 +316,17 @@ public final class CraftServer implements Server {
          this.serverVersion = CraftServer.class.getPackage().getImplementationVersion();
          this.structureManager = new CraftStructureManager(console.getStructureManager());
  
@@ -28,6 +28,7 @@ index a68ccce5be03e847116519e152945f88dab71d3c..9452889991961403ac7999bd25bc71f2
 +        } catch (IOException e) {
 +            throw new RuntimeException("Failed to connect to the registry server.", e);
 +        }
++        new Thread(this.registryClient::run, "registry-client").start();
 +        // Cardstock end
 +
          Bukkit.setServer(this);

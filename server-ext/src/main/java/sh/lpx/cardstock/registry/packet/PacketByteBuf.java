@@ -3,6 +3,7 @@ package sh.lpx.cardstock.registry.packet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import sh.lpx.cardstock.registry.packet.client.ClientPacket;
+import sh.lpx.cardstock.registry.packet.server.ServerPacket;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -10,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.function.Consumer;
 
+@SuppressWarnings("unused")
 public class PacketByteBuf {
     private final ByteBuffer buf;
 
@@ -32,6 +34,10 @@ public class PacketByteBuf {
     public static PacketByteBuf wrap(@NotNull ByteBuffer buf) {
         buf.order(ByteOrder.BIG_ENDIAN);
         return new PacketByteBuf(buf);
+    }
+
+    public static PacketByteBuf wrap(byte @NotNull [] bytes) {
+        return wrap(ByteBuffer.wrap(bytes));
     }
 
     public void writeToOtherFromBeginning(@NotNull Consumer<byte[]> writer) {
@@ -58,6 +64,15 @@ public class PacketByteBuf {
 
         writer.accept(Arrays.copyOfRange(backing, startIndex, startIndex + len));
         this.buf.position(startPos + len);
+    }
+
+    public @NotNull ServerPacket readPacket() {
+        int len = this.readUnsignedShort();
+        int id = this.readUnsignedByte();
+
+        byte[] payload = new byte[len];
+        this.readExact(payload);
+        return ServerPacket.read(id, wrap(payload));
     }
 
     public void writePacket(@NotNull ClientPacket packet) {

@@ -2,9 +2,13 @@ package sh.lpx.cardstock.registry;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import sh.lpx.cardstock.registry.packet.PacketByteBuf;
+import sh.lpx.cardstock.registry.packet.PartialPacket;
 import sh.lpx.cardstock.registry.packet.client.ClientHandshakePacket;
 import sh.lpx.cardstock.registry.packet.client.ClientPacket;
+import sh.lpx.cardstock.registry.packet.server.ServerPacket;
 
 import java.io.*;
 import java.net.Socket;
@@ -12,6 +16,8 @@ import java.net.Socket;
 public class RegistryClient
     implements Closeable
 {
+    private final Logger logger = LoggerFactory.getLogger(RegistryClient.class);
+
     private final Socket socket;
 
     private final InputStream inputStream;
@@ -51,6 +57,32 @@ public class RegistryClient
             client.sendPacket(handshake);
         }
         return client;
+    }
+
+    @SuppressWarnings("InfiniteLoopStatement")
+    public void run() {
+        while (true) {
+            try {
+                this.nextPacket();
+            } catch (IOException e) {
+                this.logger.error("Failed to handle a packet.", e);
+                // TODO: Stop trying if there are too many consecutive failed packets
+            }
+        }
+    }
+
+    @SuppressWarnings("InfiniteLoopStatement")
+    private void nextPacket()
+        throws IOException
+    {
+        PartialPacket partial = new PartialPacket();
+        while (true) {
+            partial.next((byte) this.inputStream.read()).ifPresent(this::actOnPacket);
+        }
+    }
+
+    private void actOnPacket(@NotNull ServerPacket packet) {
+        this.logger.info("Received packet: {}", packet);
     }
 
     public void sendPacket(@NotNull ClientPacket packet)

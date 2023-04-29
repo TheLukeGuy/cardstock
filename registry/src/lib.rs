@@ -111,6 +111,7 @@ impl Connection {
                 errors = 0;
             }
         }
+        info!("The client will be disconnected.");
     }
 
     fn next_packet(&mut self, _data: &Arc<RwLock<DataStore>>) -> Result<()> {
@@ -120,7 +121,7 @@ impl Connection {
             .context("failed to read the next packet")?;
         match packet {
             ClientPacket::Handshake { version } => {
-                info!("The client is using {version}.");
+                info!("The client is using `{version}`.");
                 self.stream
                     .write_packet(&ServerPacket::Handshake)
                     .context("failed to send a handshake response")?;

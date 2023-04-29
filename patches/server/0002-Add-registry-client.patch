@@ -5,18 +5,19 @@ Subject: [PATCH] Add registry client
 
 
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index a68ccce5be03e847116519e152945f88dab71d3c..7e348bd0cffaecff53280391b3e5de8eb2030795 100644
+index a68ccce5be03e847116519e152945f88dab71d3c..acf81301409cc1e2990cd41b34b6397c50d1e97f 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-@@ -295,6 +295,7 @@ public final class CraftServer implements Server {
+@@ -295,6 +295,8 @@ public final class CraftServer implements Server {
      public static Exception excessiveVelEx; // Paper - Velocity warnings
      private final io.papermc.paper.logging.SysoutCatcher sysoutCatcher = new io.papermc.paper.logging.SysoutCatcher(); // Paper
      private final CraftPotionBrewer potionBrewer = new CraftPotionBrewer(); // Paper
-+    private final sh.lpx.cardstock.registry.RegistryClient registryClient; // Cardstock
++    private sh.lpx.cardstock.registry.RegistryClient registryClient; // Cardstock
++    private final sh.lpx.cardstock.CardstockRegistryImpl cardstockRegistry = new sh.lpx.cardstock.CardstockRegistryImpl(() -> this.registryClient); // Cardstock
  
      static {
          ConfigurationSerialization.registerClass(CraftOfflinePlayer.class);
-@@ -315,6 +316,20 @@ public final class CraftServer implements Server {
+@@ -315,6 +317,20 @@ public final class CraftServer implements Server {
          this.serverVersion = CraftServer.class.getPackage().getImplementationVersion();
          this.structureManager = new CraftStructureManager(console.getStructureManager());
  
@@ -37,3 +38,96 @@ index a68ccce5be03e847116519e152945f88dab71d3c..7e348bd0cffaecff53280391b3e5de8e
          Bukkit.setServer(this);
  
          // Register all the Enchantments and PotionTypes now so we can stop new registration immediately after
+@@ -2915,4 +2931,11 @@ public final class CraftServer implements Server {
+     }
+ 
+     // Paper end
++
++    // Cardstock start
++    @Override
++    public sh.lpx.cardstock.CardstockRegistry getCardstockRegistry() {
++        return this.cardstockRegistry;
++    }
++    // Cardstock end
+ }
+diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6cf31e193257f55974a3966f0b432eb5f8f3a149
+--- /dev/null
++++ b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
+@@ -0,0 +1,75 @@
++package sh.lpx.cardstock;
++
++import org.bukkit.plugin.Plugin;
++import org.jetbrains.annotations.NotNull;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import sh.lpx.cardstock.registry.RegistryClient;
++import sh.lpx.cardstock.registry.packet.client.ClientDisablePluginPacket;
++import sh.lpx.cardstock.registry.packet.client.ClientEnablePluginPacket;
++import sh.lpx.cardstock.registry.packet.client.ClientPacket;
++import sh.lpx.cardstock.registry.packet.client.ClientSelectPluginPacket;
++
++import java.io.IOException;
++import java.util.function.Supplier;
++
++public class CardstockRegistryImpl
++    implements CardstockRegistry
++{
++    private final Logger logger = LoggerFactory.getLogger(CardstockRegistryImpl.class);
++
++    private final Supplier<@NotNull RegistryClient> client;
++    private Plugin selected;
++
++    public CardstockRegistryImpl(@NotNull Supplier<@NotNull RegistryClient> client) {
++        this.client = client;
++    }
++
++    @Override
++    public void selectPlugin(@NotNull Plugin plugin) {
++        this.selectPlugin(plugin, false);
++    }
++
++    @Override
++    public void selectPluginInitially(@NotNull Plugin plugin) {
++        this.selectPlugin(plugin, true);
++    }
++
++    private void selectPlugin(@NotNull Plugin plugin, boolean initialSelect) {
++        if (this.selected == plugin) {
++            return;
++        }
++        this.selected = plugin;
++
++        String authors;
++        if (initialSelect) {
++            authors = plugin.getPluginMeta().getAuthors().toString();
++        } else {
++            authors = null;
++        }
++        ClientPacket packet = new ClientSelectPluginPacket(plugin.getName(), authors);
++        this.sendPacket(packet);
++    }
++
++    @Override
++    public void enablePlugin(@NotNull Plugin plugin) {
++        ClientPacket packet = new ClientEnablePluginPacket(plugin.getName());
++        this.sendPacket(packet);
++    }
++
++    @Override
++    public void disablePlugin(@NotNull Plugin plugin) {
++        ClientPacket packet = new ClientDisablePluginPacket(plugin.getName());
++        this.sendPacket(packet);
++    }
++
++    private void sendPacket(@NotNull ClientPacket packet) {
++        RegistryClient client = this.client.get();
++        try {
++            client.sendPacket(packet);
++        } catch (IOException e) {
++            this.logger.warn("Failed to send a packet.", e);
++            this.logger.warn("Attempted packet for previous warning: {}", packet);
++        }
++    }
++}

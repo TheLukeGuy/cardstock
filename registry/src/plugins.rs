@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Result};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -20,7 +21,10 @@ impl Plugins {
     ) -> Result<()> {
         if !self.plugins.contains_key(&name) {
             let info = create_info().ok_or_else(|| anyhow!("the plugin info is `None`"))?;
+            debug!("Selecting plugin: `{name}` by `{}`", info.authors);
             self.plugins.insert(name.clone(), info);
+        } else {
+            debug!("Selecting plugin: `{name}`");
         }
         self.current = name;
         Ok(())
@@ -31,10 +35,13 @@ impl Plugins {
             .plugins
             .get_mut(name)
             .ok_or_else(|| anyhow!("the plugin `{name}` doesn't exist"))?;
-        match (info.enabled, enabled) {
+        match (&mut info.enabled, enabled) {
             (true, true) => bail!("the plugin is already enabled"),
             (false, false) => bail!("the plugin is already disabled"),
-            (ref mut enabled, set) => *enabled = set,
+            (enabled, set) => {
+                debug!("Setting plugin enabled: `{name}` to `{set}`");
+                *enabled = set
+            }
         }
         Ok(())
     }
@@ -50,7 +57,7 @@ impl PluginInfo {
     pub fn from_optional_authors(authors: Option<String>) -> Option<Self> {
         authors.map(|authors| PluginInfo {
             authors,
-            enabled: true,
+            enabled: false,
         })
     }
 }

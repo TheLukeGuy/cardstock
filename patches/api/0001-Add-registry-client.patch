@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Luke Chambers <consolelogluke@gmail.com>
+Date: Sat, 29 Apr 2023 18:46:50 -0400
+Subject: [PATCH] Add registry client
+
+
+diff --git a/src/main/java/org/bukkit/Server.java b/src/main/java/org/bukkit/Server.java
+index 8621dba7f10ab822b5b99ce0d05da58823605cb6..b113066d8fa1e5780d74920e3fd3b7a83796289a 100644
+--- a/src/main/java/org/bukkit/Server.java
++++ b/src/main/java/org/bukkit/Server.java
+@@ -2136,4 +2136,6 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
+      */
+     @NotNull org.bukkit.potion.PotionBrewer getPotionBrewer();
+     // Paper end
++
++    @NotNull sh.lpx.cardstock.CardstockRegistry getCardstockRegistry(); // Cardstock
+ }
+diff --git a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
+index f35cbf369f3d1e1c0b62e6dbc62ea65d9d6ca04e..2e8a20b9f8418303c710e8fe5d773cf9e74216c1 100644
+--- a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
++++ b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
+@@ -54,6 +54,7 @@ public abstract class JavaPlugin extends PluginBase {
+             throw new IllegalStateException("JavaPlugin requires to be created by a valid classloader.");
+         }
+         // Paper end
++        this.server.getCardstockRegistry().selectPluginInitially(this); // Cardstock
+     }
+ 
+     @Deprecated(forRemoval = true) // Paper
+@@ -275,9 +276,12 @@ public abstract class JavaPlugin extends PluginBase {
+         if (isEnabled != enabled) {
+             isEnabled = enabled;
+ 
++            sh.lpx.cardstock.CardstockRegistry registry = this.server.getCardstockRegistry(); // Cardstock
+             if (isEnabled) {
++                registry.enablePlugin(this); // Cardstock
+                 onEnable();
+             } else {
++                registry.disablePlugin(this); // Cardstock
+                 onDisable();
+             }
+         }
+diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistry.java b/src/main/java/sh/lpx/cardstock/CardstockRegistry.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..f0069642b70c7717502a1b1c655784b1f8459a04
+--- /dev/null
++++ b/src/main/java/sh/lpx/cardstock/CardstockRegistry.java
+@@ -0,0 +1,14 @@
++package sh.lpx.cardstock;
++
++import org.bukkit.plugin.Plugin;
++import org.jetbrains.annotations.NotNull;
++
++public interface CardstockRegistry {
++    void selectPlugin(@NotNull Plugin plugin);
++
++    void selectPluginInitially(@NotNull Plugin plugin);
++
++    void enablePlugin(@NotNull Plugin plugin);
++
++    void disablePlugin(@NotNull Plugin plugin);
++}

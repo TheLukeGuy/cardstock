@@ -17,6 +17,22 @@ pub trait NetReadExt: Read {
         }
     }
 
+    fn read_option<T>(&mut self, read: impl FnOnce(&mut Self) -> Result<T>) -> Result<Option<T>> {
+        let present = self
+            .read_bool()
+            .context("failed to read the presence indicator")?;
+        if present {
+            Ok(Some(read(self)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn read_bool(&mut self) -> Result<bool> {
+        let byte = self.read_u8().context("failed to read the boolean byte")?;
+        Ok(byte != 0)
+    }
+
     fn read_string(&mut self) -> Result<String> {
         let len = self
             .read_u16::<BigEndian>()
@@ -47,6 +63,28 @@ pub trait NetWriteExt: Write {
         self.write_u8(id).context("failed to write the packet ID")?;
         self.write_all(&buf)
             .context("failed to write the packet payload")
+    }
+
+    fn write_option<T>(
+        &mut self,
+        o: Option<T>,
+        write: impl FnOnce(&mut Self, T) -> Result<()>,
+    ) -> Result<()> {
+        let mut write_presence = |present| {
+            self.write_bool(present)
+                .context("failed to write the presence indicator")
+        };
+        if let Some(v) = o {
+            write_presence(true)?;
+            write(self, v)
+        } else {
+            write_presence(false)
+        }
+    }
+
+    fn write_bool(&mut self, b: bool) -> Result<()> {
+        self.write_u8(if b { 1 } else { 0 })
+            .context("failed to write the boolean byte")
     }
 
     fn write_str(&mut self, s: &str) -> Result<()> {

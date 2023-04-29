@@ -5,16 +5,48 @@ use std::io::{Read, Write};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub enum ClientPacket {
-    Handshake { version: String },
+    Handshake {
+        version: String,
+    },
+    SelectPlugin {
+        name: String,
+        authors: Option<String>,
+    },
+    EnablePlugin(String),
+    DisablePlugin(String),
 }
 
 impl ClientPacket {
     pub fn read(id: u8, buf: &mut impl Read) -> Result<Self> {
-        if id != 0 {
-            bail!("the packet ID is invalid ({id:#04x})");
-        }
-        let version = buf.read_string().context("failed to read the version")?;
-        Ok(Self::Handshake { version })
+        let packet = match id {
+            0x00 => {
+                let version = buf.read_string().context("failed to read the version")?;
+                Self::Handshake { version }
+            }
+            0x01 => {
+                let name = buf
+                    .read_string()
+                    .context("failed to read the plugin name")?;
+                let authors = buf
+                    .read_option(NetReadExt::read_string)
+                    .context("failed to read the plugin authors")?;
+                Self::SelectPlugin { name, authors }
+            }
+            0x02 => {
+                let name = buf
+                    .read_string()
+                    .context("failed to read the plugin name")?;
+                Self::EnablePlugin(name)
+            }
+            0x03 => {
+                let name = buf
+                    .read_string()
+                    .context("failed to read the plugin name")?;
+                Self::DisablePlugin(name)
+            }
+            _ => bail!("the packet ID is invalid ({id:#04x})"),
+        };
+        Ok(packet)
     }
 }
 

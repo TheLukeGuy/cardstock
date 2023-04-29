@@ -3,6 +3,7 @@ use crate::data::store::DataStore;
 use crate::data::PersistentData;
 use crate::net::packets::{ClientPacket, ServerPacket};
 use crate::net::types::{NetReadExt, NetWriteExt};
+use crate::plugins::{PluginInfo, Plugins};
 use anyhow::{bail, Context, Result};
 use log::{debug, error, info, warn};
 use std::borrow::Cow;
@@ -15,6 +16,7 @@ const DATA_PATH: &str = "data.toml";
 
 pub mod data;
 pub mod net;
+pub mod plugins;
 
 pub fn run() -> Result<()> {
     let config = Config::load_or_default(CONFIG_PATH).context("failed to load the config")?;
@@ -77,9 +79,10 @@ fn listen(config: Arc<Config>, data: Arc<RwLock<DataStore>>) -> Result<()> {
     Ok(())
 }
 
-pub struct Connection {
+struct Connection {
     stream: TcpStream,
     did_handshake: bool,
+    plugins: Plugins,
 }
 
 impl Connection {
@@ -87,6 +90,7 @@ impl Connection {
         Self {
             stream,
             did_handshake: false,
+            plugins: Plugins::new(),
         }
     }
 
@@ -123,6 +127,18 @@ impl Connection {
                 self.did_handshake = true;
             }
             _ if !self.did_handshake => bail!("received a non-handshake packet before handshake"),
+            ClientPacket::SelectPlugin { name, authors } => self
+                .plugins
+                .select(name.clone(), || PluginInfo::from_optional_authors(authors))
+                .with_context(|| format!("failed to select `{name}`"))?,
+            ClientPacket::EnablePlugin(name) => self
+                .plugins
+                .set_enabled(&name, true)
+                .with_context(|| format!("failed to enable `{name}`"))?,
+            ClientPacket::DisablePlugin(name) => self
+                .plugins
+                .set_enabled(&name, false)
+                .with_context(|| format!("failed to disable `{name}`"))?,
         }
         Ok(())
     }

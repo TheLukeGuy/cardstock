@@ -9,7 +9,10 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 @SuppressWarnings("unused")
 public class PacketByteBuf {
@@ -98,6 +101,31 @@ public class PacketByteBuf {
         this.writeUnsignedShort(s.length());
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
         this.writeAll(bytes);
+    }
+
+    public <T> @NotNull Optional<T> readOptional(@NotNull Function<@NotNull PacketByteBuf, T> read) {
+        boolean present = this.readBoolean();
+        if (present) {
+            return Optional.of(read.apply(this));
+        }
+        return Optional.empty();
+    }
+
+    public <T> void writeOptional(@Nullable T o, @NotNull BiConsumer<@NotNull PacketByteBuf, T> write) {
+        if (o != null) {
+            this.writeBoolean(true);
+            write.accept(this, o);
+        } else {
+            this.writeBoolean(false);
+        }
+    }
+
+    public boolean readBoolean() {
+        return this.readUnsignedByte() != 0;
+    }
+
+    public void writeBoolean(boolean b) {
+        this.writeUnsignedByte(b ? 1 : 0);
     }
 
     public void readExact(byte @NotNull [] buf) {

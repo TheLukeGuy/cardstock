@@ -15,6 +15,34 @@ index 8621dba7f10ab822b5b99ce0d05da58823605cb6..b113066d8fa1e5780d74920e3fd3b7a8
 +
 +    @NotNull sh.lpx.cardstock.CardstockRegistry getCardstockRegistry(); // Cardstock
  }
+diff --git a/src/main/java/org/bukkit/command/SimpleCommandMap.java b/src/main/java/org/bukkit/command/SimpleCommandMap.java
+index ac9a28922f8a556944a4c3649d74c32c622f0cb0..beffa56527a35a599aa0fadb27bf33bc1a22b650 100644
+--- a/src/main/java/org/bukkit/command/SimpleCommandMap.java
++++ b/src/main/java/org/bukkit/command/SimpleCommandMap.java
+@@ -66,6 +66,23 @@ public class SimpleCommandMap implements CommandMap {
+      */
+     @Override
+     public boolean register(@NotNull String label, @NotNull String fallbackPrefix, @NotNull Command command) {
++        // Cardstock start
++        // TODO: Don't use fallbackPrefix
++        org.bukkit.plugin.PluginManager pluginManager = this.server.getPluginManager();
++        sh.lpx.cardstock.CardstockRegistry cardstockRegistry = this.server.getCardstockRegistry();
++        if (pluginManager != null && cardstockRegistry != null) {
++            org.bukkit.plugin.Plugin plugin = pluginManager.getPlugin(fallbackPrefix);
++            if (plugin != null) {
++                boolean shouldRegister = cardstockRegistry
++                    .selectPlugin(plugin)
++                    .registerCmd(label)
++                    .shouldRegister();
++                if (!shouldRegister) {
++                    return true;
++                }
++            }
++        }
++        // Cardstock end
+         command.timings = co.aikar.timings.TimingsManager.getCommandTiming(fallbackPrefix, command); // Paper
+         label = label.toLowerCase(java.util.Locale.ENGLISH).trim();
+         fallbackPrefix = fallbackPrefix.toLowerCase(java.util.Locale.ENGLISH).trim();
 diff --git a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
 index f35cbf369f3d1e1c0b62e6dbc62ea65d9d6ca04e..30c67866b82fc08a496235a023ddc74cc9d0477b 100644
 --- a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
@@ -42,10 +70,10 @@ index f35cbf369f3d1e1c0b62e6dbc62ea65d9d6ca04e..30c67866b82fc08a496235a023ddc74c
          }
 diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistry.java b/src/main/java/sh/lpx/cardstock/CardstockRegistry.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..b3f16f0e09d4c96226a077d1f781120ba2160051
+index 0000000000000000000000000000000000000000..bc23f96eda1d2f99bc22500393b730b9e2420e25
 --- /dev/null
 +++ b/src/main/java/sh/lpx/cardstock/CardstockRegistry.java
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,32 @@
 +package sh.lpx.cardstock;
 +
 +import org.bukkit.plugin.Plugin;
@@ -58,8 +86,23 @@ index 0000000000000000000000000000000000000000..b3f16f0e09d4c96226a077d1f781120b
 +    @NotNull SelectedPlugin selectPluginInitially(@NotNull Plugin plugin);
 +
 +    interface SelectedPlugin {
-+        @NotNull SelectedPlugin enable();
++        void enable();
 +
-+        @NotNull SelectedPlugin disable();
++        void disable();
++
++        @NotNull CmdRegisterResult registerCmd(@NotNull String name);
++
++        enum CmdRegisterResult {
++            REGISTERED,
++            DENIED;
++
++            public static @NotNull CmdRegisterResult fromDenied(boolean denied) {
++                return denied ? DENIED : REGISTERED;
++            }
++
++            public boolean shouldRegister() {
++                return this == REGISTERED;
++            }
++        }
 +    }
 +}

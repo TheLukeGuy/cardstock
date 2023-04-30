@@ -52,21 +52,19 @@ index a68ccce5be03e847116519e152945f88dab71d3c..acf81301409cc1e2990cd41b34b6397c
  }
 diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..10f6a99618bf9cba76dc902bc55cca97cd1155d0
+index 0000000000000000000000000000000000000000..896841891a421f722f6c1061d7107201f5f115aa
 --- /dev/null
 +++ b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,104 @@
 +package sh.lpx.cardstock;
 +
 +import org.bukkit.plugin.Plugin;
 +import org.jetbrains.annotations.NotNull;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
++import sh.lpx.cardstock.registry.RegisterResponse;
 +import sh.lpx.cardstock.registry.RegistryClient;
-+import sh.lpx.cardstock.registry.packet.client.ClientDisablePluginPacket;
-+import sh.lpx.cardstock.registry.packet.client.ClientEnablePluginPacket;
-+import sh.lpx.cardstock.registry.packet.client.ClientPacket;
-+import sh.lpx.cardstock.registry.packet.client.ClientSelectPluginPacket;
++import sh.lpx.cardstock.registry.packet.client.*;
 +
 +import java.io.IOException;
 +import java.util.List;
@@ -107,11 +105,11 @@ index 0000000000000000000000000000000000000000..10f6a99618bf9cba76dc902bc55cca97
 +        String authors;
 +        if (initialSelect) {
 +            List<String> authorList = plugin.getPluginMeta().getAuthors();
-+            if (authorList.size() == 1) {
-+                authors = authorList.get(0);
-+            } else {
-+                authors = authorList.toString();
-+            }
++            authors = switch (authorList.size()) {
++                case 0 -> "plugin authors";
++                case 1 -> authorList.get(0);
++                default -> authorList.get(0) + " + others";
++            };
 +        } else {
 +            authors = null;
 +        }
@@ -123,17 +121,32 @@ index 0000000000000000000000000000000000000000..10f6a99618bf9cba76dc902bc55cca97
 +        implements SelectedPlugin
 +    {
 +        @Override
-+        public @NotNull SelectedPlugin enable() {
++        public void enable() {
 +            ClientPacket packet = new ClientEnablePluginPacket();
 +            CardstockRegistryImpl.this.sendPacket(packet);
-+            return this;
 +        }
 +
 +        @Override
-+        public @NotNull SelectedPlugin disable() {
++        public void disable() {
 +            ClientPacket packet = new ClientDisablePluginPacket();
 +            CardstockRegistryImpl.this.sendPacket(packet);
-+            return this;
++        }
++
++        @Override
++        public @NotNull CmdRegisterResult registerCmd(@NotNull String name) {
++            ClientPacket packet = new ClientRegisterCmdPacket(name);
++            CardstockRegistryImpl.this.sendPacket(packet);
++
++            RegisterResponse.Complete response = CardstockRegistryImpl.this.client.get().takeRegisterResponse();
++            String[] msgs = response.msgs();
++            if (msgs.length != 0) {
++                Logger pluginLogger = CardstockRegistryImpl.this.selected.getSLF4JLogger();
++                for (String msg : msgs) {
++                    // TODO: Different log levels
++                    pluginLogger.info(msg);
++                }
++            }
++            return CmdRegisterResult.fromDenied(response.denied());
 +        }
 +    }
 +

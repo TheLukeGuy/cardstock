@@ -7,6 +7,9 @@ public interface ServerPacket {
     static @NotNull ServerPacket read(int id, @NotNull PacketByteBuf buf) {
         return switch (id) {
             case 0x00 -> new ServerHandshakePacket();
+            case 0x01 -> new ServerMsgPacket(buf.readString());
+            case 0x02 -> new ServerDenyPacket();
+            case 0x03 -> new ServerDonePacket();
             default -> throw new IllegalArgumentException(String.format("The packet ID is invalid. (0x%02x)", id));
         };
     }

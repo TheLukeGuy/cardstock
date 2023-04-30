@@ -5,7 +5,7 @@ use crate::net::packets::{ClientPacket, ServerPacket};
 use crate::net::types::{NetReadExt, NetWriteExt};
 use crate::plugins::{GlobalCommandStatus, PluginInfo, Plugins};
 use anyhow::{bail, Context, Result};
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use std::borrow::Cow;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
@@ -122,6 +122,7 @@ impl Connection {
             .stream
             .read_packet()
             .context("failed to read the next packet")?;
+        trace!("Received packet: {packet:?}");
         match packet {
             ClientPacket::Handshake { version } => {
                 info!("The client is using `{version}`.");
@@ -154,6 +155,7 @@ impl Connection {
         let current_plugin = self.plugins.selected();
         match owner {
             Some(plugin) if *plugin == current_plugin => {
+                debug!("Allowing registered command `{cmd}`.");
                 self.send_msg(format!(
                     "{}: Thank you for registering /{cmd}!",
                     self.plugins.current_authors()
@@ -162,6 +164,7 @@ impl Connection {
                     .register_cmd(cmd, GlobalCommandStatus::Registered)
             }
             Some(owner) => {
+                debug!("Denying command `{cmd}`.");
                 self.send_msg(format!(
                     "{}: /{cmd} is already registered to {owner}. Please choose a different name.",
                     self.plugins.current_authors()
@@ -170,8 +173,9 @@ impl Connection {
                     .context("failed to send a deny packet")?;
             }
             None => {
+                debug!("Allowing unregistered command `{cmd}`.");
                 self.send_msg(format!(
-                    "Hey, {}! Your command, /{cmd} is unregistered.",
+                    "Hey, {}! Your command /{cmd} is unregistered. You have 29 days remaining.",
                     self.plugins.current_authors()
                 ))?;
                 self.plugins
@@ -184,6 +188,7 @@ impl Connection {
     }
 
     pub fn send_packet(&mut self, packet: &ServerPacket) -> Result<()> {
+        trace!("Sending packet: {packet:?}");
         self.stream
             .write_packet(packet)
             .with_context(|| format!("failed to write a packet ({packet:?})"))

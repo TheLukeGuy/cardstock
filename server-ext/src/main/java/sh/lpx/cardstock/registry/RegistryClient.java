@@ -8,11 +8,12 @@ import sh.lpx.cardstock.registry.packet.PacketByteBuf;
 import sh.lpx.cardstock.registry.packet.PartialPacket;
 import sh.lpx.cardstock.registry.packet.client.ClientHandshakePacket;
 import sh.lpx.cardstock.registry.packet.client.ClientPacket;
-import sh.lpx.cardstock.registry.packet.server.ServerHandshakePacket;
-import sh.lpx.cardstock.registry.packet.server.ServerPacket;
+import sh.lpx.cardstock.registry.packet.server.*;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 public class RegistryClient
     implements Closeable
@@ -21,6 +22,9 @@ public class RegistryClient
 
     private final Socket socket;
     private boolean didHandshake = false;
+
+    private final RegisterResponse registerResponse = new RegisterResponse();
+    private final BlockingQueue<RegisterResponse.Complete> registerResponseQueue = new ArrayBlockingQueue<>(1);
 
     private final InputStream inputStream;
     private final OutputStream outputStream;
@@ -79,7 +83,7 @@ public class RegistryClient
     {
         PartialPacket partial = new PartialPacket();
         while (true) {
-            partial.next((byte) this.inputStream.read()).ifPresent(this::actOnPacket);
+            partial.next(this.inputStream.read()).ifPresent(this::actOnPacket);
         }
     }
 
@@ -88,6 +92,9 @@ public class RegistryClient
             case ServerHandshakePacket ignored -> this.didHandshake = true;
             case ServerPacket ignored && !this.didHandshake ->
                 throw new IllegalStateException("Received a non-handshake packet before handshake.");
+            case ServerMsgPacket msgPacket -> this.registerResponse.addMsg(msgPacket.msg());
+            case ServerDenyPacket ignored -> this.registerResponse.setDenied();
+            case ServerDonePacket ignored -> this.registerResponseQueue.add(this.registerResponse.reset());
             default -> this.logger.warn("Ignoring packet: {}", packet);
         }
     }
@@ -107,6 +114,16 @@ public class RegistryClient
             });
         } catch (UncheckedIOException e) {
             throw e.getCause();
+        }
+    }
+
+    public RegisterResponse.@NotNull Complete takeRegisterResponse() {
+        while (true) {
+            try {
+                return this.registerResponseQueue.take();
+            } catch (InterruptedException e) {
+                // Continue looping
+            }
         }
     }
 

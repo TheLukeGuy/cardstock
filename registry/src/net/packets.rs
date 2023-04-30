@@ -1,5 +1,6 @@
 use crate::net::types::{NetReadExt, NetWriteExt};
 use anyhow::{bail, Context, Result};
+use log::Level;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
@@ -47,10 +48,10 @@ impl ClientPacket {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum ServerPacket {
     Handshake,
-    Msg(String),
+    Msg { log_level: Level, contents: String },
     Deny,
     Done,
 }
@@ -59,8 +60,14 @@ impl ServerPacket {
     pub fn write(&self, buf: &mut impl Write) -> Result<u8> {
         let id = match self {
             ServerPacket::Handshake => 0x00,
-            ServerPacket::Msg(msg) => {
-                buf.write_str(msg).context("failed to write the message")?;
+            ServerPacket::Msg {
+                log_level,
+                contents,
+            } => {
+                buf.write_log_level(*log_level)
+                    .context("failed to write the log level")?;
+                buf.write_str(contents)
+                    .context("failed to write the contents")?;
                 0x01
             }
             ServerPacket::Deny => 0x02,

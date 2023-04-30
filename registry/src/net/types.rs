@@ -1,6 +1,7 @@
 use crate::net::packets::{ClientPacket, PartialPacket, ServerPacket};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use log::Level;
 use std::io::{Read, Write};
 
 pub trait NetReadExt: Read {
@@ -42,6 +43,21 @@ pub trait NetReadExt: Read {
         self.read_exact(&mut buf)
             .context("failed to read the string contents")?;
         String::from_utf8(buf).context("the string is malformed")
+    }
+
+    fn read_log_level(&mut self) -> Result<Level> {
+        let byte = self
+            .read_u8()
+            .context("failed to read the log level byte")?;
+        let level = match byte {
+            4 => Level::Error,
+            3 => Level::Warn,
+            2 => Level::Info,
+            1 => Level::Debug,
+            0 => Level::Trace,
+            invalid => bail!("invalid log level ({invalid})"),
+        };
+        Ok(level)
     }
 }
 
@@ -97,6 +113,18 @@ pub trait NetWriteExt: Write {
             .context("failed to write the string length")?;
         self.write_all(bytes)
             .context("failed to write the string contents")
+    }
+
+    fn write_log_level(&mut self, level: Level) -> Result<()> {
+        let byte = match level {
+            Level::Error => 4,
+            Level::Warn => 3,
+            Level::Info => 2,
+            Level::Debug => 1,
+            Level::Trace => 0,
+        };
+        self.write_u8(byte)
+            .context("failed to write the log level byte")
     }
 }
 

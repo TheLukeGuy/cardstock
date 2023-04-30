@@ -2,6 +2,7 @@ package sh.lpx.cardstock.registry.packet;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 import sh.lpx.cardstock.registry.packet.client.ClientPacket;
 import sh.lpx.cardstock.registry.packet.server.ServerPacket;
 
@@ -90,19 +91,6 @@ public class PacketByteBuf {
         );
     }
 
-    public String readString() {
-        int len = this.readUnsignedShort();
-        byte[] buf = new byte[len];
-        this.readExact(buf);
-        return new String(buf, StandardCharsets.UTF_8);
-    }
-
-    public void writeString(@NotNull String s) {
-        this.writeUnsignedShort(s.length());
-        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
-        this.writeAll(bytes);
-    }
-
     public <T> @NotNull Optional<T> readOptional(@NotNull Function<@NotNull PacketByteBuf, T> read) {
         boolean present = this.readBoolean();
         if (present) {
@@ -126,6 +114,31 @@ public class PacketByteBuf {
 
     public void writeBoolean(boolean b) {
         this.writeUnsignedByte(b ? 1 : 0);
+    }
+
+    public @NotNull String readString() {
+        int len = this.readUnsignedShort();
+        byte[] buf = new byte[len];
+        this.readExact(buf);
+        return new String(buf, StandardCharsets.UTF_8);
+    }
+
+    public void writeString(@NotNull String s) {
+        this.writeUnsignedShort(s.length());
+        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
+        this.writeAll(bytes);
+    }
+
+    public @NotNull BiConsumer<@NotNull Logger, String> readLogFn() {
+        int logLevelByte = this.readUnsignedByte();
+        return switch (logLevelByte) {
+            case 4 -> Logger::error;
+            case 3 -> Logger::warn;
+            case 2 -> Logger::info;
+            case 1 -> Logger::debug;
+            case 0 -> Logger::trace;
+            default -> throw new IndexOutOfBoundsException(logLevelByte);
+        };
     }
 
     public void readExact(byte @NotNull [] buf) {

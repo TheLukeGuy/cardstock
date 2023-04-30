@@ -5,7 +5,7 @@ use crate::net::packets::{ClientPacket, ServerPacket};
 use crate::net::types::{NetReadExt, NetWriteExt};
 use crate::plugins::{GlobalCommandStatus, PluginInfo, Plugins};
 use anyhow::{bail, Context, Result};
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace, warn, Level};
 use std::borrow::Cow;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
@@ -156,28 +156,37 @@ impl Connection {
         match owner {
             Some(plugin) if *plugin == current_plugin => {
                 debug!("Allowing registered command `{cmd}`.");
-                self.send_msg(format!(
-                    "{}: Thank you for registering /{cmd}!",
-                    self.plugins.current_authors()
-                ))?;
+                self.send_msg(
+                    Level::Info,
+                    format!(
+                        "{}: Thank you for registering /{cmd}!",
+                        self.plugins.current_authors()
+                    ),
+                )?;
                 self.plugins
                     .register_cmd(cmd, GlobalCommandStatus::Registered)
             }
             Some(owner) => {
                 debug!("Denying command `{cmd}`.");
-                self.send_msg(format!(
+                self.send_msg(
+                    Level::Error,
+                    format!(
                     "{}: /{cmd} is already registered to {owner}. Please choose a different name.",
                     self.plugins.current_authors()
-                ))?;
+                ),
+                )?;
                 self.send_packet(&ServerPacket::Deny)
                     .context("failed to send a deny packet")?;
             }
             None => {
                 debug!("Allowing unregistered command `{cmd}`.");
-                self.send_msg(format!(
-                    "Hey, {}! Your command /{cmd} is unregistered. You have 29 days remaining.",
-                    self.plugins.current_authors()
-                ))?;
+                self.send_msg(
+                    Level::Warn,
+                    format!(
+                        "Hey, {}! Your command /{cmd} is unregistered. You have 29 days remaining.",
+                        self.plugins.current_authors()
+                    ),
+                )?;
                 self.plugins
                     .register_cmd(cmd, GlobalCommandStatus::Unregistered);
             }
@@ -194,9 +203,12 @@ impl Connection {
             .with_context(|| format!("failed to write a packet ({packet:?})"))
     }
 
-    pub fn send_msg(&mut self, msg: impl ToString) -> Result<()> {
-        self.send_packet(&ServerPacket::Msg(msg.to_string()))
-            .context("failed to send a message packet")
+    pub fn send_msg(&mut self, log_level: Level, msg: impl ToString) -> Result<()> {
+        self.send_packet(&ServerPacket::Msg {
+            log_level,
+            contents: msg.to_string(),
+        })
+        .context("failed to send a message packet")
     }
 }
 

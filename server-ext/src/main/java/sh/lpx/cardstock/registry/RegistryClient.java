@@ -92,7 +92,7 @@ public class RegistryClient
             case ServerHandshakePacket ignored -> this.didHandshake = true;
             case ServerPacket ignored && !this.didHandshake ->
                 throw new IllegalStateException("Received a non-handshake packet before handshake.");
-            case ServerMsgPacket msgPacket -> this.registerResponse.addMsg(msgPacket.msg());
+            case ServerMsgPacket msgPacket -> this.registerResponse.addMsg(msgPacket.logFn(), msgPacket.contents());
             case ServerDenyPacket ignored -> this.registerResponse.setDenied();
             case ServerDonePacket ignored -> this.registerResponseQueue.add(this.registerResponse.reset());
             default -> this.logger.warn("Ignoring packet: {}", packet);

@@ -52,10 +52,10 @@ index a68ccce5be03e847116519e152945f88dab71d3c..acf81301409cc1e2990cd41b34b6397c
  }
 diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..953a3fd23fb1d1459a0a064540380b48348e9a58
+index 0000000000000000000000000000000000000000..8e09eb8044f0a98ae695af450ce4b40fded66110
 --- /dev/null
 +++ b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,103 @@
 +package sh.lpx.cardstock;
 +
 +import org.bukkit.plugin.Plugin;
@@ -138,12 +138,11 @@ index 0000000000000000000000000000000000000000..953a3fd23fb1d1459a0a064540380b48
 +            CardstockRegistryImpl.this.sendPacket(packet);
 +
 +            RegisterResponse.Complete response = CardstockRegistryImpl.this.client.get().takeRegisterResponse();
-+            String[] msgs = response.msgs();
++            RegisterResponse.Msg[] msgs = response.msgs();
 +            if (msgs.length != 0) {
 +                Logger pluginLogger = CardstockRegistryImpl.this.selected.getSLF4JLogger();
-+                for (String msg : msgs) {
-+                    // Cardstock TODO: Different log levels
-+                    pluginLogger.info(msg);
++                for (RegisterResponse.Msg msg : msgs) {
++                    msg.logFn().accept(pluginLogger, msg.contents());
 +                }
 +            }
 +            return CmdRegisterResult.fromDenied(response.denied());

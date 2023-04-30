@@ -6,6 +6,7 @@ use std::time::Duration;
 pub struct Config {
     pub server: ServerConfig,
     pub save: SaveConfig,
+    pub ads: AdsConfig,
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]
@@ -19,6 +20,13 @@ pub struct SaveConfig {
     pub enabled: bool,
     #[serde(with = "humantime_serde")]
     pub interval: Duration,
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]
+pub struct AdsConfig {
+    pub enabled: bool,
+    pub one_in_x_chance: u32,
+    pub list: Vec<String>,
 }
 
 impl PersistentData for Config {

@@ -50,7 +50,7 @@ impl ClientPacket {
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum ServerPacket {
-    Handshake,
+    Handshake { ads_enabled: bool },
     Msg { log_level: Level, contents: String },
     Deny,
     Done,
@@ -59,7 +59,11 @@ pub enum ServerPacket {
 impl ServerPacket {
     pub fn write(&self, buf: &mut impl Write) -> Result<u8> {
         let id = match self {
-            ServerPacket::Handshake => 0x00,
+            ServerPacket::Handshake { ads_enabled } => {
+                buf.write_bool(*ads_enabled)
+                    .context("failed to write the ad indicator")?;
+                0x00
+            }
             ServerPacket::Msg {
                 log_level,
                 contents,

@@ -9,6 +9,7 @@ anyhow = "1.0.70"
 byteorder = "1.4.3"
 humantime-serde = "1.1.1"
 log = "0.4.17"
+rand = "0.8.5"
 serde = { version = "1.0.160", features = ["derive", "rc"] }
 simplelog = "0.12.1"
 toml = "0.7.3"

@@ -6,6 +6,8 @@ use crate::net::types::{NetReadExt, NetWriteExt};
 use crate::plugins::{GlobalCommandStatus, PluginInfo, Plugins};
 use anyhow::{bail, Context, Result};
 use log::{debug, error, info, trace, warn, Level};
+use rand::seq::SliceRandom;
+use rand::Rng;
 use std::borrow::Cow;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, RwLock};
@@ -69,7 +71,7 @@ fn listen(config: Arc<Config>, data: Arc<RwLock<DataStore>>) -> Result<()> {
         let connection_data = Arc::clone(&data);
         let result = thread::Builder::new()
             .name(format!("conn/{formatted_addr}"))
-            .spawn(|| Connection::new(stream, connection_data).run(connection_config))
+            .spawn(|| Connection::new(stream, connection_config, connection_data).run())
             .context("failed to spawn the connection handle thread");
         if let Err(error) = result {
             warn!("Failed to start connection handling for {formatted_addr}: {error:?}");
@@ -81,6 +83,7 @@ fn listen(config: Arc<Config>, data: Arc<RwLock<DataStore>>) -> Result<()> {
 
 struct Connection {
     stream: TcpStream,
+    config: Arc<Config>,
     data: Arc<RwLock<DataStore>>,
 
     did_handshake: bool,
@@ -88,23 +91,24 @@ struct Connection {
 }
 
 impl Connection {
-    pub fn new(stream: TcpStream, data: Arc<RwLock<DataStore>>) -> Self {
+    pub fn new(stream: TcpStream, config: Arc<Config>, data: Arc<RwLock<DataStore>>) -> Self {
         Self {
             stream,
+            config,
             data,
             did_handshake: false,
             plugins: Plugins::new(),
         }
     }
 
-    pub fn run(&mut self, config: Arc<Config>) {
-        let set_error_tolerance = config.server.error_tolerance >= 0;
+    pub fn run(&mut self) {
+        let set_error_tolerance = self.config.server.error_tolerance >= 0;
         let mut errors = 0;
         loop {
             if let Err(error) = self.next_packet() {
                 warn!("Failed to handle a packet: {error:?}");
                 if set_error_tolerance {
-                    if errors == config.server.error_tolerance {
+                    if errors == self.config.server.error_tolerance {
                         error!("Failed to handle too many packets.");
                         break;
                     }
@@ -126,8 +130,10 @@ impl Connection {
         match packet {
             ClientPacket::Handshake { version } => {
                 info!("The client is using `{version}`.");
-                self.send_packet(&ServerPacket::Handshake)
-                    .context("failed to send a handshake response")?;
+                self.send_packet(&ServerPacket::Handshake {
+                    ads_enabled: self.config.ads.enabled,
+                })
+                .context("failed to send a handshake response")?;
                 self.did_handshake = true;
             }
             _ if !self.did_handshake => bail!("received a non-handshake packet before handshake"),
@@ -200,7 +206,7 @@ impl Connection {
         trace!("Sending packet: {packet:?}");
         self.stream
             .write_packet(packet)
-            .with_context(|| format!("failed to write a packet ({packet:?})"))
+            .with_context(|| format!("failed to write the packet ({packet:?})"))
     }
 
     pub fn send_msg(&mut self, log_level: Level, msg: impl ToString) -> Result<()> {
@@ -208,7 +214,23 @@ impl Connection {
             log_level,
             contents: msg.to_string(),
         })
-        .context("failed to send a message packet")
+        .context("failed to send the message packet")?;
+
+        if self.config.ads.enabled {
+            let mut rng = rand::thread_rng();
+            let send_ad = rng.gen_ratio(1, self.config.ads.one_in_x_chance);
+            if send_ad {
+                if let Some(ad) = self.config.ads.list.choose(&mut rng) {
+                    debug!("Sending an ad.");
+                    self.send_packet(&ServerPacket::Msg {
+                        log_level: Level::Info,
+                        contents: format!("Ad | {ad}"),
+                    })
+                    .context("failed to send the ad message packet")?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 

@@ -6,7 +6,7 @@ import sh.lpx.cardstock.registry.packet.PacketByteBuf;
 public interface ServerPacket {
     static @NotNull ServerPacket read(int id, @NotNull PacketByteBuf buf) {
         return switch (id) {
-            case 0x00 -> new ServerHandshakePacket();
+            case 0x00 -> new ServerHandshakePacket(buf.readBoolean());
             case 0x01 -> new ServerMsgPacket(buf.readLogFn(), buf.readString());
             case 0x02 -> new ServerDenyPacket();
             case 0x03 -> new ServerDonePacket();

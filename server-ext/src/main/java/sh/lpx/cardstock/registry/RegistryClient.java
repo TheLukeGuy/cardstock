@@ -89,7 +89,15 @@ public class RegistryClient
 
     private void actOnPacket(@NotNull ServerPacket packet) {
         switch (packet) {
-            case ServerHandshakePacket ignored -> this.didHandshake = true;
+            case ServerHandshakePacket ignored -> {
+                if (ignored.adsEnabled()) {
+                    this.logger.warn(
+                        "Your configured registry server will send you ads. "
+                            + "These ads are not officially endorsed by Cardstock or any plugin."
+                    );
+                }
+                this.didHandshake = true;
+            }
             case ServerPacket ignored && !this.didHandshake ->
                 throw new IllegalStateException("Received a non-handshake packet before handshake.");
             case ServerMsgPacket msgPacket -> this.registerResponse.addMsg(msgPacket.logFn(), msgPacket.contents());

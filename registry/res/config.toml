@@ -5,3 +5,11 @@ error_tolerance = 5
 [save]
 enabled = true
 interval = "20s"
+
+[ads]
+enabled = true
+one_in_x_chance = 10
+list = [
+    "Your ad here! Contact [name] on [platform].",
+    "Give me money! paypal.me/[name]",
+]

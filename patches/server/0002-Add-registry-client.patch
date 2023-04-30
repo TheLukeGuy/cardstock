@@ -52,7 +52,7 @@ index a68ccce5be03e847116519e152945f88dab71d3c..acf81301409cc1e2990cd41b34b6397c
  }
 diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..8e09eb8044f0a98ae695af450ce4b40fded66110
+index 0000000000000000000000000000000000000000..e5eed94ca362c057fa5709dabdd0721385d22514
 --- /dev/null
 +++ b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
 @@ -0,0 +1,103 @@
@@ -108,7 +108,7 @@ index 0000000000000000000000000000000000000000..8e09eb8044f0a98ae695af450ce4b40f
 +            authors = switch (authorList.size()) {
 +                case 0 -> "plugin authors";
 +                case 1 -> authorList.get(0);
-+                default -> authorList.get(0) + " + others";
++                default -> authorList.get(0) + " & others";
 +            };
 +        } else {
 +            authors = null;

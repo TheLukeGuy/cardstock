@@ -42,15 +42,16 @@ index f35cbf369f3d1e1c0b62e6dbc62ea65d9d6ca04e..30c67866b82fc08a496235a023ddc74c
          }
 diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistry.java b/src/main/java/sh/lpx/cardstock/CardstockRegistry.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..3f9b4e20385b19cde42b24b009f8aa9cc4ad025a
+index 0000000000000000000000000000000000000000..b3f16f0e09d4c96226a077d1f781120ba2160051
 --- /dev/null
 +++ b/src/main/java/sh/lpx/cardstock/CardstockRegistry.java
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,17 @@
 +package sh.lpx.cardstock;
 +
 +import org.bukkit.plugin.Plugin;
 +import org.jetbrains.annotations.NotNull;
 +
++@SuppressWarnings("UnusedReturnValue")
 +public interface CardstockRegistry {
 +    @NotNull SelectedPlugin selectPlugin(@NotNull Plugin plugin);
 +

@@ -52,7 +52,7 @@ index a68ccce5be03e847116519e152945f88dab71d3c..acf81301409cc1e2990cd41b34b6397c
  }
 diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..896841891a421f722f6c1061d7107201f5f115aa
+index 0000000000000000000000000000000000000000..953a3fd23fb1d1459a0a064540380b48348e9a58
 --- /dev/null
 +++ b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
 @@ -0,0 +1,104 @@
@@ -142,7 +142,7 @@ index 0000000000000000000000000000000000000000..896841891a421f722f6c1061d7107201
 +            if (msgs.length != 0) {
 +                Logger pluginLogger = CardstockRegistryImpl.this.selected.getSLF4JLogger();
 +                for (String msg : msgs) {
-+                    // TODO: Different log levels
++                    // Cardstock TODO: Different log levels
 +                    pluginLogger.info(msg);
 +                }
 +            }

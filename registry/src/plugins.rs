@@ -6,7 +6,7 @@ use std::collections::HashMap;
 #[derive(Clone, Eq, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct Plugins {
     plugins: HashMap<String, PluginInfo>,
-    current: String, // TODO: Make this an Option<String>
+    current: String, // Cardstock TODO: Make this an Option<String>
 }
 
 impl Plugins {

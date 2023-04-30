@@ -72,7 +72,7 @@ public class RegistryClient
                 this.nextPacket();
             } catch (Exception e) {
                 this.logger.warn("Failed to handle a packet.", e);
-                // TODO: Stop trying if there are too many consecutive failed packets
+                // Cardstock TODO: Stop trying if there are too many consecutive failed packets
             }
         }
     }

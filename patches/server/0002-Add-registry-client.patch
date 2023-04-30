@@ -52,10 +52,10 @@ index a68ccce5be03e847116519e152945f88dab71d3c..acf81301409cc1e2990cd41b34b6397c
  }
 diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6cf31e193257f55974a3966f0b432eb5f8f3a149
+index 0000000000000000000000000000000000000000..cf3625791fe64e12daec4c18261183a593af6a14
 --- /dev/null
 +++ b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,81 @@
 +package sh.lpx.cardstock;
 +
 +import org.bukkit.plugin.Plugin;
@@ -69,6 +69,7 @@ index 0000000000000000000000000000000000000000..6cf31e193257f55974a3966f0b432eb5
 +import sh.lpx.cardstock.registry.packet.client.ClientSelectPluginPacket;
 +
 +import java.io.IOException;
++import java.util.List;
 +import java.util.function.Supplier;
 +
 +public class CardstockRegistryImpl
@@ -101,7 +102,12 @@ index 0000000000000000000000000000000000000000..6cf31e193257f55974a3966f0b432eb5
 +
 +        String authors;
 +        if (initialSelect) {
-+            authors = plugin.getPluginMeta().getAuthors().toString();
++            List<String> authorList = plugin.getPluginMeta().getAuthors();
++            if (authorList.size() == 1) {
++                authors = authorList.get(0);
++            } else {
++                authors = authorList.toString();
++            }
 +        } else {
 +            authors = null;
 +        }

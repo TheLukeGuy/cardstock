@@ -45,12 +45,33 @@ impl Plugins {
         }
         Ok(())
     }
+
+    pub fn register_cmd(&mut self, name: String, status: GlobalCommandStatus) {
+        self.current_info_mut().cmds.insert(name, status);
+    }
+
+    pub fn current_authors(&self) -> &str {
+        &self.current_info().authors
+    }
+
+    fn current_info(&self) -> &PluginInfo {
+        self.plugins.get(&self.current).unwrap()
+    }
+
+    fn current_info_mut(&mut self) -> &mut PluginInfo {
+        self.plugins.get_mut(&self.current).unwrap()
+    }
+
+    pub fn selected(&self) -> &str {
+        &self.current
+    }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct PluginInfo {
     pub authors: String,
     pub enabled: bool,
+    pub cmds: HashMap<String, GlobalCommandStatus>,
 }
 
 impl PluginInfo {
@@ -58,6 +79,14 @@ impl PluginInfo {
         authors.map(|authors| PluginInfo {
             authors,
             enabled: false,
+            cmds: HashMap::new(),
         })
     }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]
+pub enum GlobalCommandStatus {
+    #[default]
+    Unregistered,
+    Registered,
 }

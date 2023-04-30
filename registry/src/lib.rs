@@ -3,7 +3,7 @@ use crate::data::store::DataStore;
 use crate::data::PersistentData;
 use crate::net::packets::{ClientPacket, ServerPacket};
 use crate::net::types::{NetReadExt, NetWriteExt};
-use crate::plugins::{PluginInfo, Plugins};
+use crate::plugins::{GlobalCommandStatus, PluginInfo, Plugins};
 use anyhow::{bail, Context, Result};
 use log::{debug, error, info, warn};
 use std::borrow::Cow;
@@ -69,7 +69,7 @@ fn listen(config: Arc<Config>, data: Arc<RwLock<DataStore>>) -> Result<()> {
         let connection_data = Arc::clone(&data);
         let result = thread::Builder::new()
             .name(format!("conn/{formatted_addr}"))
-            .spawn(|| Connection::new(stream).run(connection_config, connection_data))
+            .spawn(|| Connection::new(stream, connection_data).run(connection_config))
             .context("failed to spawn the connection handle thread");
         if let Err(error) = result {
             warn!("Failed to start connection handling for {formatted_addr}: {error:?}");
@@ -81,24 +81,27 @@ fn listen(config: Arc<Config>, data: Arc<RwLock<DataStore>>) -> Result<()> {
 
 struct Connection {
     stream: TcpStream,
+    data: Arc<RwLock<DataStore>>,
+
     did_handshake: bool,
     plugins: Plugins,
 }
 
 impl Connection {
-    pub fn new(stream: TcpStream) -> Self {
+    pub fn new(stream: TcpStream, data: Arc<RwLock<DataStore>>) -> Self {
         Self {
             stream,
+            data,
             did_handshake: false,
             plugins: Plugins::new(),
         }
     }
 
-    pub fn run(&mut self, config: Arc<Config>, data: Arc<RwLock<DataStore>>) {
+    pub fn run(&mut self, config: Arc<Config>) {
         let set_error_tolerance = config.server.error_tolerance >= 0;
         let mut errors = 0;
         loop {
-            if let Err(error) = self.next_packet(&data) {
+            if let Err(error) = self.next_packet() {
                 warn!("Failed to handle a packet: {error:?}");
                 if set_error_tolerance {
                     if errors == config.server.error_tolerance {
@@ -114,7 +117,7 @@ impl Connection {
         info!("The client will be disconnected.");
     }
 
-    fn next_packet(&mut self, _data: &Arc<RwLock<DataStore>>) -> Result<()> {
+    fn next_packet(&mut self) -> Result<()> {
         let packet = self
             .stream
             .read_packet()
@@ -122,8 +125,7 @@ impl Connection {
         match packet {
             ClientPacket::Handshake { version } => {
                 info!("The client is using `{version}`.");
-                self.stream
-                    .write_packet(&ServerPacket::Handshake)
+                self.send_packet(&ServerPacket::Handshake)
                     .context("failed to send a handshake response")?;
                 self.did_handshake = true;
             }
@@ -140,8 +142,56 @@ impl Connection {
                 .plugins
                 .set_enabled(&name, false)
                 .with_context(|| format!("failed to disable `{name}`"))?,
+            ClientPacket::RegisterCmd(name) => self
+                .handle_register(name)
+                .context("failed to handle a command registration")?,
         }
         Ok(())
+    }
+
+    fn handle_register(&mut self, cmd: String) -> Result<()> {
+        let owner = self.data.read().unwrap().check(&cmd);
+        let current_plugin = self.plugins.selected();
+        match owner {
+            Some(plugin) if *plugin == current_plugin => {
+                self.send_msg(format!(
+                    "{}: Thank you for registering /{cmd}!",
+                    self.plugins.current_authors()
+                ))?;
+                self.plugins
+                    .register_cmd(cmd, GlobalCommandStatus::Registered)
+            }
+            Some(owner) => {
+                self.send_msg(format!(
+                    "{}: /{cmd} is already registered to {owner}. Please choose a different name.",
+                    self.plugins.current_authors()
+                ))?;
+                self.send_packet(&ServerPacket::Deny)
+                    .context("failed to send a deny packet")?;
+            }
+            None => {
+                self.send_msg(format!(
+                    "Hey, {}! Your command, /{cmd} is unregistered.",
+                    self.plugins.current_authors()
+                ))?;
+                self.plugins
+                    .register_cmd(cmd, GlobalCommandStatus::Unregistered);
+            }
+        }
+        self.send_packet(&ServerPacket::Done)
+            .context("failed to send a done packet")?;
+        Ok(())
+    }
+
+    pub fn send_packet(&mut self, packet: &ServerPacket) -> Result<()> {
+        self.stream
+            .write_packet(packet)
+            .with_context(|| format!("failed to write a packet ({packet:?})"))
+    }
+
+    pub fn send_msg(&mut self, msg: impl ToString) -> Result<()> {
+        self.send_packet(&ServerPacket::Msg(msg.to_string()))
+            .context("failed to send a message packet")
     }
 }
 

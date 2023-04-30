@@ -7,18 +7,18 @@ use std::sync::Arc;
 
 #[derive(Clone, Eq, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct DataStore {
-    commands: HashMap<String, Arc<String>>,
+    cmds: HashMap<String, Arc<String>>,
 }
 
 impl DataStore {
     pub fn check(&self, name: &str) -> Option<Arc<String>> {
-        self.commands.get(name).cloned()
+        self.cmds.get(name).cloned()
     }
 
     pub fn register(&mut self, name: impl Into<String>, plugin: impl Into<String>) -> Result<()> {
         let name = name.into();
         let plugin = plugin.into();
-        match self.commands.entry(name.clone()) {
+        match self.cmds.entry(name.clone()) {
             Entry::Occupied(_) => bail!("the command `{name}` is already registered to `{plugin}`"),
             Entry::Vacant(vacant) => {
                 vacant.insert(Arc::new(plugin));

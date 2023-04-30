@@ -1,4 +1,4 @@
-use crate::net::types::NetReadExt;
+use crate::net::types::{NetReadExt, NetWriteExt};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
@@ -14,6 +14,7 @@ pub enum ClientPacket {
     },
     EnablePlugin(String),
     DisablePlugin(String),
+    RegisterCmd(String),
 }
 
 impl ClientPacket {
@@ -44,6 +45,12 @@ impl ClientPacket {
                     .context("failed to read the plugin name")?;
                 Self::DisablePlugin(name)
             }
+            0x04 => {
+                let name = buf
+                    .read_string()
+                    .context("failed to read the command name")?;
+                Self::RegisterCmd(name)
+            }
             _ => bail!("the packet ID is invalid ({id:#04x})"),
         };
         Ok(packet)
@@ -53,11 +60,23 @@ impl ClientPacket {
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub enum ServerPacket {
     Handshake,
+    Msg(String),
+    Deny,
+    Done,
 }
 
 impl ServerPacket {
-    pub fn write(&self, _buf: &mut impl Write) -> Result<u8> {
-        Ok(0)
+    pub fn write(&self, buf: &mut impl Write) -> Result<u8> {
+        let id = match self {
+            ServerPacket::Handshake => 0x00,
+            ServerPacket::Msg(msg) => {
+                buf.write_str(msg).context("failed to write the message")?;
+                0x01
+            }
+            ServerPacket::Deny => 0x02,
+            ServerPacket::Done => 0x03,
+        };
+        Ok(id)
     }
 }
 

@@ -6,5 +6,5 @@ import sh.lpx.cardstock.registry.packet.PacketByteBuf;
 public interface ClientPacket {
     int id();
 
-    void write(@NotNull PacketByteBuf buf);
+    default void write(@NotNull PacketByteBuf buf) {}
 }

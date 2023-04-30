@@ -6,7 +6,7 @@ use std::collections::HashMap;
 #[derive(Clone, Eq, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct Plugins {
     plugins: HashMap<String, PluginInfo>,
-    current: String,
+    current: String, // TODO: Make this an Option<String>
 }
 
 impl Plugins {
@@ -21,25 +21,22 @@ impl Plugins {
     ) -> Result<()> {
         if !self.plugins.contains_key(&name) {
             let info = create_info().ok_or_else(|| anyhow!("the plugin info is `None`"))?;
-            debug!("Selecting plugin: `{name}` by `{}`", info.authors);
+            debug!("Selecting plugin `{name}` by `{}`.", info.authors);
             self.plugins.insert(name.clone(), info);
         } else {
-            debug!("Selecting plugin: `{name}`");
+            debug!("Selecting plugin `{name}`.");
         }
         self.current = name;
         Ok(())
     }
 
-    pub fn set_enabled(&mut self, name: &str, enabled: bool) -> Result<()> {
-        let info = self
-            .plugins
-            .get_mut(name)
-            .ok_or_else(|| anyhow!("the plugin `{name}` doesn't exist"))?;
+    pub fn set_enabled(&mut self, enabled: bool) -> Result<()> {
+        let info = self.current_info_mut();
         match (&mut info.enabled, enabled) {
             (true, true) => bail!("the plugin is already enabled"),
             (false, false) => bail!("the plugin is already disabled"),
             (enabled, set) => {
-                debug!("Setting plugin enabled: `{name}` to `{set}`");
+                debug!("Setting plugin enabled to `{set}`.");
                 *enabled = set
             }
         }

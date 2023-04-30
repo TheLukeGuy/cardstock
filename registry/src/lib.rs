@@ -134,17 +134,17 @@ impl Connection {
                 .plugins
                 .select(name.clone(), || PluginInfo::from_optional_authors(authors))
                 .with_context(|| format!("failed to select `{name}`"))?,
-            ClientPacket::EnablePlugin(name) => self
+            ClientPacket::EnablePlugin => self
                 .plugins
-                .set_enabled(&name, true)
-                .with_context(|| format!("failed to enable `{name}`"))?,
-            ClientPacket::DisablePlugin(name) => self
+                .set_enabled(true)
+                .context("failed to enable the selected plugin")?,
+            ClientPacket::DisablePlugin => self
                 .plugins
-                .set_enabled(&name, false)
-                .with_context(|| format!("failed to disable `{name}`"))?,
+                .set_enabled(false)
+                .context("failed to disable the selected plugin")?,
             ClientPacket::RegisterCmd(name) => self
                 .handle_register(name)
-                .context("failed to handle a command registration")?,
+                .context("failed to handle command registration")?,
         }
         Ok(())
     }

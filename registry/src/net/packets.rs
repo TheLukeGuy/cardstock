@@ -12,8 +12,8 @@ pub enum ClientPacket {
         name: String,
         authors: Option<String>,
     },
-    EnablePlugin(String),
-    DisablePlugin(String),
+    EnablePlugin,
+    DisablePlugin,
     RegisterCmd(String),
 }
 
@@ -33,18 +33,8 @@ impl ClientPacket {
                     .context("failed to read the plugin authors")?;
                 Self::SelectPlugin { name, authors }
             }
-            0x02 => {
-                let name = buf
-                    .read_string()
-                    .context("failed to read the plugin name")?;
-                Self::EnablePlugin(name)
-            }
-            0x03 => {
-                let name = buf
-                    .read_string()
-                    .context("failed to read the plugin name")?;
-                Self::DisablePlugin(name)
-            }
+            0x02 => Self::EnablePlugin,
+            0x03 => Self::DisablePlugin,
             0x04 => {
                 let name = buf
                     .read_string()

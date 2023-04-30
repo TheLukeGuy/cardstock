@@ -16,7 +16,7 @@ index 8621dba7f10ab822b5b99ce0d05da58823605cb6..b113066d8fa1e5780d74920e3fd3b7a8
 +    @NotNull sh.lpx.cardstock.CardstockRegistry getCardstockRegistry(); // Cardstock
  }
 diff --git a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
-index f35cbf369f3d1e1c0b62e6dbc62ea65d9d6ca04e..2e8a20b9f8418303c710e8fe5d773cf9e74216c1 100644
+index f35cbf369f3d1e1c0b62e6dbc62ea65d9d6ca04e..30c67866b82fc08a496235a023ddc74cc9d0477b 100644
 --- a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
 +++ b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
 @@ -54,6 +54,7 @@ public abstract class JavaPlugin extends PluginBase {
@@ -31,32 +31,34 @@ index f35cbf369f3d1e1c0b62e6dbc62ea65d9d6ca04e..2e8a20b9f8418303c710e8fe5d773cf9
          if (isEnabled != enabled) {
              isEnabled = enabled;
  
-+            sh.lpx.cardstock.CardstockRegistry registry = this.server.getCardstockRegistry(); // Cardstock
++            sh.lpx.cardstock.CardstockRegistry.SelectedPlugin registryPlugin = this.server.getCardstockRegistry().selectPlugin(this); // Cardstock
              if (isEnabled) {
-+                registry.enablePlugin(this); // Cardstock
++                registryPlugin.enable(); // Cardstock
                  onEnable();
              } else {
-+                registry.disablePlugin(this); // Cardstock
++                registryPlugin.disable(); // Cardstock
                  onDisable();
              }
          }
 diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistry.java b/src/main/java/sh/lpx/cardstock/CardstockRegistry.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..f0069642b70c7717502a1b1c655784b1f8459a04
+index 0000000000000000000000000000000000000000..3f9b4e20385b19cde42b24b009f8aa9cc4ad025a
 --- /dev/null
 +++ b/src/main/java/sh/lpx/cardstock/CardstockRegistry.java
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,16 @@
 +package sh.lpx.cardstock;
 +
 +import org.bukkit.plugin.Plugin;
 +import org.jetbrains.annotations.NotNull;
 +
 +public interface CardstockRegistry {
-+    void selectPlugin(@NotNull Plugin plugin);
++    @NotNull SelectedPlugin selectPlugin(@NotNull Plugin plugin);
 +
-+    void selectPluginInitially(@NotNull Plugin plugin);
++    @NotNull SelectedPlugin selectPluginInitially(@NotNull Plugin plugin);
 +
-+    void enablePlugin(@NotNull Plugin plugin);
++    interface SelectedPlugin {
++        @NotNull SelectedPlugin enable();
 +
-+    void disablePlugin(@NotNull Plugin plugin);
++        @NotNull SelectedPlugin disable();
++    }
 +}

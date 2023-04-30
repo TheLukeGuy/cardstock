@@ -52,10 +52,10 @@ index a68ccce5be03e847116519e152945f88dab71d3c..acf81301409cc1e2990cd41b34b6397c
  }
 diff --git a/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..cf3625791fe64e12daec4c18261183a593af6a14
+index 0000000000000000000000000000000000000000..10f6a99618bf9cba76dc902bc55cca97cd1155d0
 --- /dev/null
 +++ b/src/main/java/sh/lpx/cardstock/CardstockRegistryImpl.java
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,91 @@
 +package sh.lpx.cardstock;
 +
 +import org.bukkit.plugin.Plugin;
@@ -80,18 +80,22 @@ index 0000000000000000000000000000000000000000..cf3625791fe64e12daec4c18261183a5
 +    private final Supplier<@NotNull RegistryClient> client;
 +    private Plugin selected;
 +
++    private final SelectedPlugin selectedInstance = this.new SelectedPluginImpl();
++
 +    public CardstockRegistryImpl(@NotNull Supplier<@NotNull RegistryClient> client) {
 +        this.client = client;
 +    }
 +
 +    @Override
-+    public void selectPlugin(@NotNull Plugin plugin) {
++    public @NotNull SelectedPlugin selectPlugin(@NotNull Plugin plugin) {
 +        this.selectPlugin(plugin, false);
++        return this.selectedInstance;
 +    }
 +
 +    @Override
-+    public void selectPluginInitially(@NotNull Plugin plugin) {
++    public @NotNull SelectedPlugin selectPluginInitially(@NotNull Plugin plugin) {
 +        this.selectPlugin(plugin, true);
++        return this.selectedInstance;
 +    }
 +
 +    private void selectPlugin(@NotNull Plugin plugin, boolean initialSelect) {
@@ -115,16 +119,22 @@ index 0000000000000000000000000000000000000000..cf3625791fe64e12daec4c18261183a5
 +        this.sendPacket(packet);
 +    }
 +
-+    @Override
-+    public void enablePlugin(@NotNull Plugin plugin) {
-+        ClientPacket packet = new ClientEnablePluginPacket(plugin.getName());
-+        this.sendPacket(packet);
-+    }
++    private class SelectedPluginImpl
++        implements SelectedPlugin
++    {
++        @Override
++        public @NotNull SelectedPlugin enable() {
++            ClientPacket packet = new ClientEnablePluginPacket();
++            CardstockRegistryImpl.this.sendPacket(packet);
++            return this;
++        }
 +
-+    @Override
-+    public void disablePlugin(@NotNull Plugin plugin) {
-+        ClientPacket packet = new ClientDisablePluginPacket(plugin.getName());
-+        this.sendPacket(packet);
++        @Override
++        public @NotNull SelectedPlugin disable() {
++            ClientPacket packet = new ClientDisablePluginPacket();
++            CardstockRegistryImpl.this.sendPacket(packet);
++            return this;
++        }
 +    }
 +
 +    private void sendPacket(@NotNull ClientPacket packet) {

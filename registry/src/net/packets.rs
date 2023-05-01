@@ -59,12 +59,12 @@ pub enum ServerPacket {
 impl ServerPacket {
     pub fn write(&self, buf: &mut impl Write) -> Result<u8> {
         let id = match self {
-            ServerPacket::Handshake { ads_enabled } => {
+            Self::Handshake { ads_enabled } => {
                 buf.write_bool(*ads_enabled)
                     .context("failed to write the ad indicator")?;
                 0x00
             }
-            ServerPacket::Msg {
+            Self::Msg {
                 log_level,
                 contents,
             } => {
@@ -74,8 +74,8 @@ impl ServerPacket {
                     .context("failed to write the contents")?;
                 0x01
             }
-            ServerPacket::Deny => 0x02,
-            ServerPacket::Done => 0x03,
+            Self::Deny => 0x02,
+            Self::Done => 0x03,
         };
         Ok(id)
     }

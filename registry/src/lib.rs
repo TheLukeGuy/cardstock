@@ -163,7 +163,7 @@ impl Connection {
             Some(plugin) if *plugin == current_plugin => {
                 debug!("Allowing registered command `{cmd}`.");
                 self.send_msg(
-                    Level::Info,
+                    Level::Debug,
                     format!(
                         "{}: Thank you for registering /{cmd}!",
                         self.plugins.current_authors()
@@ -189,8 +189,13 @@ impl Connection {
                 self.send_msg(
                     Level::Warn,
                     format!(
-                        "Hey, {}! Your command /{cmd} is unregistered. You have 29 days remaining.",
-                        self.plugins.current_authors()
+                        concat!(
+                            "Hey, {}! Your command /{cmd} is unregistered. ",
+                            "Please register it with \"/register {cmd} {}\"."
+                        ),
+                        self.plugins.current_authors(),
+                        self.plugins.selected(),
+                        cmd = cmd,
                     ),
                 )?;
                 self.plugins

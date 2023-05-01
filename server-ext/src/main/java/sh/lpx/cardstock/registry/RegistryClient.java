@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sh.lpx.cardstock.Cardstock;
 import sh.lpx.cardstock.registry.packet.PacketByteBuf;
 import sh.lpx.cardstock.registry.packet.PartialPacket;
 import sh.lpx.cardstock.registry.packet.client.ClientHandshakePacket;
@@ -91,7 +92,7 @@ public class RegistryClient
         switch (packet) {
             case ServerHandshakePacket ignored -> {
                 if (ignored.adsEnabled()) {
-                    this.logger.warn(
+                    Cardstock.LOGGER.warn(
                         "Your configured registry server will send you ads. "
                             + "These ads are not officially endorsed by Cardstock or any plugin."
                     );

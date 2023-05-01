@@ -19,6 +19,7 @@ const DATA_PATH: &str = "data.toml";
 pub mod data;
 pub mod net;
 pub mod plugins;
+pub mod suggest;
 
 pub fn run() -> Result<()> {
     let config = Config::load_or_default(CONFIG_PATH).context("failed to load the config")?;
@@ -165,24 +166,38 @@ impl Connection {
                 self.send_msg(
                     Level::Debug,
                     format!(
-                        "{}: Thank you for registering /{cmd}!",
+                        "{}, thank you for registering /{cmd}!",
                         self.plugins.current_authors()
                     ),
-                )?;
+                )
+                .context("failed to send the message packet")?;
                 self.plugins
                     .register_cmd(cmd, GlobalCommandStatus::Registered)
             }
             Some(owner) => {
-                debug!("Denying command `{cmd}`.");
+                let suggestions = {
+                    let read_guard = self.data.read().unwrap();
+                    suggest::gen(self.plugins.selected(), &cmd, |name| {
+                        read_guard.check(name).is_some()
+                    })
+                }
+                .join(", ");
+                debug!("Denying command `{cmd}` and suggesting `{suggestions}`.");
+
                 self.send_msg(
                     Level::Error,
                     format!(
-                    "{}: /{cmd} is already registered to {owner}. Please choose a different name.",
-                    self.plugins.current_authors()
-                ),
-                )?;
+                        "/{cmd} is already registered to {owner}. Please choose a different name."
+                    ),
+                )
+                .context("failed to send the message packet")?;
+                self.send_msg(
+                    Level::Error,
+                    format!("Try one of these instead: {suggestions}"),
+                )
+                .context("failed to send the suggestion message packet")?;
                 self.send_packet(&ServerPacket::Deny)
-                    .context("failed to send a deny packet")?;
+                    .context("failed to send the deny packet")?;
             }
             None => {
                 debug!("Allowing unregistered command `{cmd}`.");
@@ -197,13 +212,14 @@ impl Connection {
                         self.plugins.selected(),
                         cmd = cmd,
                     ),
-                )?;
+                )
+                .context("failed to send the message packet")?;
                 self.plugins
                     .register_cmd(cmd, GlobalCommandStatus::Unregistered);
             }
         }
         self.send_packet(&ServerPacket::Done)
-            .context("failed to send a done packet")?;
+            .context("failed to send the done packet")?;
         Ok(())
     }
 

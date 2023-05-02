@@ -1,0 +1,72 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Luke Chambers <consolelogluke@gmail.com>
+Date: Tue, 2 May 2023 00:48:44 -0400
+Subject: [PATCH] Prevent bypassing command restrictions
+
+
+diff --git a/src/main/java/org/bukkit/event/player/PlayerCommandPreprocessEvent.java b/src/main/java/org/bukkit/event/player/PlayerCommandPreprocessEvent.java
+index 48a00fb50fe32c732a578d5179b3bb43ffd68b69..67b0488e7911bab59c9120c40cae17f460ed498e 100644
+--- a/src/main/java/org/bukkit/event/player/PlayerCommandPreprocessEvent.java
++++ b/src/main/java/org/bukkit/event/player/PlayerCommandPreprocessEvent.java
+@@ -47,8 +47,8 @@ import org.jetbrains.annotations.NotNull;
+  */
+ public class PlayerCommandPreprocessEvent extends PlayerEvent implements Cancellable {
+     private static final HandlerList handlers = new HandlerList();
+-    private boolean cancel = false;
+-    private String message;
++    private final boolean cancel = false; // Cardstock - make final
++    private final String message; // Cardstock - make final
+     private final Set<Player> recipients;
+ 
+     public PlayerCommandPreprocessEvent(@NotNull final Player player, @NotNull final String message) {
+@@ -70,7 +70,7 @@ public class PlayerCommandPreprocessEvent extends PlayerEvent implements Cancell
+ 
+     @Override
+     public void setCancelled(boolean cancel) {
+-        this.cancel = cancel;
++        // this.cancel = cancel; // Cardstock
+     }
+ 
+     /**
+@@ -98,7 +98,7 @@ public class PlayerCommandPreprocessEvent extends PlayerEvent implements Cancell
+     public void setMessage(@NotNull String command) throws IllegalArgumentException {
+         Preconditions.checkArgument(command != null, "Command cannot be null");
+         Preconditions.checkArgument(!command.isEmpty(), "Command cannot be empty");
+-        this.message = command;
++        // this.message = command; // Cardstock
+     }
+ 
+     /**
+diff --git a/src/main/java/org/bukkit/event/server/ServerCommandEvent.java b/src/main/java/org/bukkit/event/server/ServerCommandEvent.java
+index 617459afaea20213e948b1010278ab0131e08338..74284886ba0e2daee0d22d305b7424aa49351bdc 100644
+--- a/src/main/java/org/bukkit/event/server/ServerCommandEvent.java
++++ b/src/main/java/org/bukkit/event/server/ServerCommandEvent.java
+@@ -41,9 +41,9 @@ import org.jetbrains.annotations.NotNull;
+  */
+ public class ServerCommandEvent extends ServerEvent implements Cancellable {
+     private static final HandlerList handlers = new HandlerList();
+-    private String command;
++    private final String command; // Cardstock - make final
+     private final CommandSender sender;
+-    private boolean cancel = false;
++    private final boolean cancel = false; // Cardstock - make final
+ 
+     public ServerCommandEvent(@NotNull final CommandSender sender, @NotNull final String command) {
+         this.command = command;
+@@ -67,7 +67,7 @@ public class ServerCommandEvent extends ServerEvent implements Cancellable {
+      * @param message New message that the server will execute
+      */
+     public void setCommand(@NotNull String message) {
+-        this.command = message;
++        // this.command = message; // Cardstock
+     }
+ 
+     /**
+@@ -98,6 +98,6 @@ public class ServerCommandEvent extends ServerEvent implements Cancellable {
+ 
+     @Override
+     public void setCancelled(boolean cancel) {
+-        this.cancel = cancel;
++        // this.cancel = cancel; // Cardstock
+     }
+ }

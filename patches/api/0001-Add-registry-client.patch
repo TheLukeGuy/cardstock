@@ -16,27 +16,22 @@ index 8621dba7f10ab822b5b99ce0d05da58823605cb6..b113066d8fa1e5780d74920e3fd3b7a8
 +    @NotNull sh.lpx.cardstock.CardstockRegistry getCardstockRegistry(); // Cardstock
  }
 diff --git a/src/main/java/org/bukkit/command/SimpleCommandMap.java b/src/main/java/org/bukkit/command/SimpleCommandMap.java
-index ac9a28922f8a556944a4c3649d74c32c622f0cb0..65cd30b80b181daaaa277df8ef6dddaab6ebf1b1 100644
+index ac9a28922f8a556944a4c3649d74c32c622f0cb0..ae0d9d6db4f97d28fe7947d6089a47e48611fca6 100644
 --- a/src/main/java/org/bukkit/command/SimpleCommandMap.java
 +++ b/src/main/java/org/bukkit/command/SimpleCommandMap.java
-@@ -66,6 +66,23 @@ public class SimpleCommandMap implements CommandMap {
+@@ -66,6 +66,18 @@ public class SimpleCommandMap implements CommandMap {
       */
      @Override
      public boolean register(@NotNull String label, @NotNull String fallbackPrefix, @NotNull Command command) {
 +        // Cardstock start
-+        // Cardstock TODO: Don't use fallbackPrefix
-+        org.bukkit.plugin.PluginManager pluginManager = this.server.getPluginManager();
-+        sh.lpx.cardstock.CardstockRegistry cardstockRegistry = this.server.getCardstockRegistry();
-+        if (pluginManager != null && cardstockRegistry != null) {
-+            org.bukkit.plugin.Plugin plugin = pluginManager.getPlugin(fallbackPrefix);
-+            if (plugin != null) {
-+                boolean shouldRegister = cardstockRegistry
-+                    .selectPlugin(plugin)
-+                    .registerCmd(label)
-+                    .shouldRegister();
-+                if (!shouldRegister) {
-+                    return true;
-+                }
++        if (command instanceof org.bukkit.command.PluginIdentifiableCommand pluginCommand) {
++            boolean shouldRegister = this.server
++                .getCardstockRegistry()
++                .selectPlugin(pluginCommand.getPlugin())
++                .registerCmd(label)
++                .shouldRegister();
++            if (!shouldRegister) {
++                return true;
 +            }
 +        }
 +        // Cardstock end

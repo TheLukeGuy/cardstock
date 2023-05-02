@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Luke Chambers <consolelogluke@gmail.com>
+Date: Tue, 2 May 2023 00:06:24 -0400
+Subject: [PATCH] Prevent double faults while shutting down early
+
+
+diff --git a/src/main/java/io/papermc/paper/chunk/system/io/RegionFileIOThread.java b/src/main/java/io/papermc/paper/chunk/system/io/RegionFileIOThread.java
+index a08cde4eefe879adcee7c4118bc38f98c5097ed0..4f1bd856d822f0c1cd1cc91921fbaa7c882d15be 100644
+--- a/src/main/java/io/papermc/paper/chunk/system/io/RegionFileIOThread.java
++++ b/src/main/java/io/papermc/paper/chunk/system/io/RegionFileIOThread.java
+@@ -186,6 +186,11 @@ public final class RegionFileIOThread extends PrioritisedQueueExecutorThread {
+      * @param wait Whether to wait until all tasks have completed.
+      */
+     public static void close(final boolean wait) {
++        // Cardstock start - prevent double faults while shutting down early
++        if (threads == null) {
++            return;
++        }
++        // Cardstock end
+         for (int i = 0, len = threads.length; i < len; ++i) {
+             threads[i].close(false, true);
+         }

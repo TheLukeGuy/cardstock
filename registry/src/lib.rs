@@ -103,13 +103,13 @@ impl Connection {
     }
 
     pub fn run(&mut self) {
-        let set_error_tolerance = self.config.server.error_tolerance >= 0;
+        let error_tolerance_set = self.config.server.error_tolerance >= 0;
         let mut errors = 0;
         loop {
             match self.next_packet() {
                 Err(error) => {
                     warn!("Failed to handle a packet: {error:?}");
-                    if set_error_tolerance {
+                    if error_tolerance_set {
                         if errors == self.config.server.error_tolerance {
                             error!("Failed to handle too many packets.");
                             break;
@@ -118,15 +118,10 @@ impl Connection {
                     }
                 }
                 Ok(PacketResult::Disconnect) => break,
-                _ if set_error_tolerance => errors = 0,
+                _ if error_tolerance_set => errors = 0,
                 _ => {}
             }
         }
-
-        if self.send_packet(&ServerPacket::Disconnect).is_err() {
-            warn!("Failed to gracefully disconnect the client.");
-        }
-        info!("The connection will be dropped.");
     }
 
     fn next_packet(&mut self) -> Result<PacketResult> {
@@ -273,6 +268,15 @@ impl Connection {
             }
         }
         Ok(())
+    }
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        if self.send_packet(&ServerPacket::Disconnect).is_err() {
+            warn!("Failed to gracefully disconnect the client.");
+        }
+        info!("The connection is being dropped.");
     }
 }
 

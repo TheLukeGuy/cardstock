@@ -4,6 +4,55 @@ Date: Tue, 2 May 2023 00:48:44 -0400
 Subject: [PATCH] Prevent bypassing command restrictions
 
 
+diff --git a/src/main/java/org/bukkit/command/SimpleCommandMap.java b/src/main/java/org/bukkit/command/SimpleCommandMap.java
+index ae0d9d6db4f97d28fe7947d6089a47e48611fca6..01bf72534184e5f92aaf5368c31a0e8ec257c646 100644
+--- a/src/main/java/org/bukkit/command/SimpleCommandMap.java
++++ b/src/main/java/org/bukkit/command/SimpleCommandMap.java
+@@ -24,6 +24,7 @@ import org.jetbrains.annotations.Nullable;
+ public class SimpleCommandMap implements CommandMap {
+     protected final Map<String, Command> knownCommands = new HashMap<String, Command>();
+     private final Server server;
++    private final StackWalker stackWalker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE); // Cardstock
+ 
+     public SimpleCommandMap(@NotNull final Server server) {
+         this.server = server;
+@@ -78,6 +79,36 @@ public class SimpleCommandMap implements CommandMap {
+             }
+         }
+         // Cardstock end
++        // Cardstock start - prevent bypassing command restrictions
++        if (!(command instanceof org.bukkit.command.PluginIdentifiableCommand)) {
++            java.util.Optional<String> pluginName = this.stackWalker.walk(
++                stream -> stream
++                    .map(frame -> {
++                        try {
++                            org.bukkit.plugin.java.JavaPlugin plugin =
++                                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(frame.getDeclaringClass());
++                            return plugin.getName();
++                        } catch (IllegalStateException e) {
++                            return "an unknown plugin";
++                        } catch (IllegalArgumentException e) {
++                            return null;
++                        }
++                    })
++                    .filter(java.util.Objects::nonNull)
++                    .findFirst()
++            );
++            if (pluginName.isPresent()) {
++                sh.lpx.cardstock.Cardstock.LOGGER.error(
++                    "Refusing to register /"
++                        + label
++                        + " because it isn't plugin-identifiable despite being registered by "
++                        + pluginName.get()
++                        + "."
++                );
++                return true;
++            }
++        }
++        // Cardstock end
+         command.timings = co.aikar.timings.TimingsManager.getCommandTiming(fallbackPrefix, command); // Paper
+         label = label.toLowerCase(java.util.Locale.ENGLISH).trim();
+         fallbackPrefix = fallbackPrefix.toLowerCase(java.util.Locale.ENGLISH).trim();
 diff --git a/src/main/java/org/bukkit/event/player/PlayerCommandPreprocessEvent.java b/src/main/java/org/bukkit/event/player/PlayerCommandPreprocessEvent.java
 index 48a00fb50fe32c732a578d5179b3bb43ffd68b69..67b0488e7911bab59c9120c40cae17f460ed498e 100644
 --- a/src/main/java/org/bukkit/event/player/PlayerCommandPreprocessEvent.java

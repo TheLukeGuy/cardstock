@@ -2,16 +2,24 @@ use crate::net::packets::{ClientPacket, PartialPacket, ServerPacket};
 use anyhow::{bail, Context, Result};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use log::Level;
-use std::io::{Read, Write};
+use std::io;
+use std::io::{ErrorKind, Read, Write};
 
 pub trait NetReadExt: Read {
-    fn read_packet(&mut self) -> Result<ClientPacket> {
+    fn read_packet(&mut self) -> Result<PacketOpResult<ClientPacket>> {
         let mut partial = PartialPacket::new();
         loop {
-            let next = self.read_u8().context("failed to read the next byte")?;
+            let next = match self.read_u8() {
+                Ok(next) => next,
+                Err(error) => {
+                    return PacketOpResult::from_io_error(error)
+                        .context("failed to read the next byte");
+                }
+            };
             match partial.next(next) {
                 PartialPacket::Complete { id, packet } => {
-                    break ClientPacket::read(id, &mut &packet[..])
+                    let packet = ClientPacket::read(id, &mut &packet[..])?;
+                    break Ok(PacketOpResult::Ok(packet));
                 }
                 p => partial = p,
             }
@@ -64,21 +72,28 @@ pub trait NetReadExt: Read {
 impl<R> NetReadExt for R where R: Read + ?Sized {}
 
 pub trait NetWriteExt: Write {
-    fn write_packet(&mut self, packet: &ServerPacket) -> Result<()> {
-        let mut buf = Vec::with_capacity(1024);
+    fn write_packet(&mut self, packet: &ServerPacket) -> Result<PacketOpResult<()>> {
+        let mut payload = Vec::with_capacity(1024);
         let id = packet
-            .write(&mut buf)
-            .context("failed to write the packet to a temporary buffer")?;
-        let len = buf
+            .write(&mut payload)
+            .context("failed to write the packet payload to a temporary buffer")?;
+        let len = payload
             .len()
             .try_into()
             .context("the packet length doesn't fit in a u16")?;
 
-        self.write_u16::<BigEndian>(len)
+        let mut buf = Vec::with_capacity(2 + 1 + payload.len());
+        buf.write_u16::<BigEndian>(len)
             .context("failed to write the packet length")?;
-        self.write_u8(id).context("failed to write the packet ID")?;
-        self.write_all(&buf)
-            .context("failed to write the packet payload")
+        buf.write_u8(id).context("failed to write the packet ID")?;
+        buf.write_all(&payload)
+            .context("failed to write the packet payload")?;
+
+        if let Err(error) = self.write_all(&buf) {
+            PacketOpResult::from_io_error(error).context("failed to write the full packet")
+        } else {
+            Ok(PacketOpResult::Ok(()))
+        }
     }
 
     fn write_option<T>(
@@ -129,3 +144,22 @@ pub trait NetWriteExt: Write {
 }
 
 impl<W> NetWriteExt for W where W: Write + ?Sized {}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub enum PacketOpResult<T> {
+    Ok(T),
+    AppearsDisconnected,
+}
+
+impl<T> PacketOpResult<T> {
+    pub fn from_io_error(error: io::Error) -> Result<Self> {
+        if let ErrorKind::ConnectionAborted
+        | ErrorKind::ConnectionReset
+        | ErrorKind::UnexpectedEof = error.kind()
+        {
+            Ok(Self::AppearsDisconnected)
+        } else {
+            Err(error.into())
+        }
+    }
+}

@@ -2,7 +2,7 @@ use crate::data::config::Config;
 use crate::data::store::DataStore;
 use crate::data::PersistentData;
 use crate::net::packets::{ClientPacket, ServerPacket};
-use crate::net::types::{NetReadExt, NetWriteExt};
+use crate::net::types::{NetReadExt, NetWriteExt, PacketOpResult};
 use crate::plugins::{GlobalCommandStatus, PluginInfo, Plugins};
 use anyhow::{bail, Context, Result};
 use log::{debug, error, info, trace, warn, Level};
@@ -106,28 +106,43 @@ impl Connection {
         let set_error_tolerance = self.config.server.error_tolerance >= 0;
         let mut errors = 0;
         loop {
-            if let Err(error) = self.next_packet() {
-                warn!("Failed to handle a packet: {error:?}");
-                if set_error_tolerance {
-                    if errors == self.config.server.error_tolerance {
-                        error!("Failed to handle too many packets.");
-                        break;
+            match self.next_packet() {
+                Err(error) => {
+                    warn!("Failed to handle a packet: {error:?}");
+                    if set_error_tolerance {
+                        if errors == self.config.server.error_tolerance {
+                            error!("Failed to handle too many packets.");
+                            break;
+                        }
+                        errors += 1;
                     }
-                    errors += 1;
                 }
-            } else if set_error_tolerance {
-                errors = 0;
+                Ok(PacketResult::Disconnect) => break,
+                _ if set_error_tolerance => errors = 0,
+                _ => {}
             }
         }
-        info!("The client will be disconnected.");
+
+        if self.send_packet(&ServerPacket::Disconnect).is_err() {
+            warn!("Failed to gracefully disconnect the client.");
+        }
+        info!("The connection will be dropped.");
     }
 
-    fn next_packet(&mut self) -> Result<()> {
+    fn next_packet(&mut self) -> Result<PacketResult> {
         let packet = self
             .stream
             .read_packet()
             .context("failed to read the next packet")?;
+        let packet = match packet {
+            PacketOpResult::Ok(packet) => packet,
+            PacketOpResult::AppearsDisconnected => {
+                warn!("The client forcefully disconnected.");
+                return Ok(PacketResult::Disconnect);
+            }
+        };
         trace!("Received packet: {packet:?}");
+
         match packet {
             ClientPacket::Handshake { version } => {
                 info!("The client is using `{version}`.");
@@ -153,8 +168,12 @@ impl Connection {
             ClientPacket::RegisterCmd(name) => self
                 .handle_register(name)
                 .context("failed to handle command registration")?,
+            ClientPacket::Disconnect => {
+                info!("The client is gracefully disconnecting.");
+                return Ok(PacketResult::Disconnect);
+            }
         }
-        Ok(())
+        Ok(PacketResult::Ok)
     }
 
     fn handle_register(&mut self, cmd: String) -> Result<()> {
@@ -227,7 +246,9 @@ impl Connection {
         trace!("Sending packet: {packet:?}");
         self.stream
             .write_packet(packet)
-            .with_context(|| format!("failed to write the packet ({packet:?})"))
+            .with_context(|| format!("failed to write the packet ({packet:?})"))?;
+        // Cardstock TODO: Handle client disconnections
+        Ok(())
     }
 
     pub fn send_msg(&mut self, log_level: Level, msg: impl ToString) -> Result<()> {
@@ -253,6 +274,11 @@ impl Connection {
         }
         Ok(())
     }
+}
+
+enum PacketResult {
+    Ok,
+    Disconnect,
 }
 
 fn save_periodically(config: Arc<Config>, data: Arc<RwLock<DataStore>>) {

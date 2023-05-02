@@ -16,6 +16,7 @@ pub enum ClientPacket {
     EnablePlugin,
     DisablePlugin,
     RegisterCmd(String),
+    Disconnect,
 }
 
 impl ClientPacket {
@@ -42,6 +43,7 @@ impl ClientPacket {
                     .context("failed to read the command name")?;
                 Self::RegisterCmd(name)
             }
+            0x05 => Self::Disconnect,
             _ => bail!("the packet ID is invalid ({id:#04x})"),
         };
         Ok(packet)
@@ -54,6 +56,7 @@ pub enum ServerPacket {
     Msg { log_level: Level, contents: String },
     Deny,
     Done,
+    Disconnect,
 }
 
 impl ServerPacket {
@@ -76,6 +79,7 @@ impl ServerPacket {
             }
             Self::Deny => 0x02,
             Self::Done => 0x03,
+            Self::Disconnect => 0x04,
         };
         Ok(id)
     }

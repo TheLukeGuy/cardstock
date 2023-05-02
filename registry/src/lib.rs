@@ -261,7 +261,7 @@ impl Connection {
                     debug!("Sending an ad.");
                     self.send_packet(&ServerPacket::Msg {
                         log_level: Level::Info,
-                        contents: format!("Ad | {ad}"),
+                        contents: format!("[Ad] {ad}"),
                     })
                     .context("failed to send the ad message packet")?;
                 }

@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Luke Chambers <consolelogluke@gmail.com>
+Date: Tue, 2 May 2023 00:59:40 -0400
+Subject: [PATCH] Add utilities
+
+
+diff --git a/src/main/java/sh/lpx/cardstock/Cardstock.java b/src/main/java/sh/lpx/cardstock/Cardstock.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..a340bec768f6ce1c8990a9bf773e0ef2000d6df4
+--- /dev/null
++++ b/src/main/java/sh/lpx/cardstock/Cardstock.java
+@@ -0,0 +1,9 @@
++package sh.lpx.cardstock;
++
++import org.jetbrains.annotations.NotNull;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++public class Cardstock {
++    public static final @NotNull Logger LOGGER = LoggerFactory.getLogger("Cardstock");
++}
